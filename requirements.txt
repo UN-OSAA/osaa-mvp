@@ -5,6 +5,7 @@ ibis-framework[duckdb]==9.5.0
 python-dotenv>=1.0.1
 numpy<2.0.0  # Pinning to numpy 1.x for compatibility
 pandas<3.0.0  # Ensuring pandas is compatible with numpy 1.x
+psycopg2-binary>=2.9.9  # For PostgreSQL connection
 pyarrow<13,>=12.0.1
 requests>=2.31.0
 ruff>=0.3.0

@@ -3,6 +3,16 @@ gateways:
     connection:
       type: duckdb
       database: osaa_mvp.db
+      # Configure DuckDB with httpfs extension for S3 access
+      extensions: ['httpfs']
+
+    state_connection:
+      type: postgres
+      host: ${POSTGRES_HOST}
+      port: 5432
+      database: sqlmesh_state
+      user: ${POSTGRES_USER}
+      password: ${POSTGRES_PASSWORD}
 
 default_gateway: local
 
