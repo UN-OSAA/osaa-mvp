@@ -6,6 +6,7 @@ package := "osaa-mvp"
 venv_dir := ".venv"
 requirements_file := "requirements.txt"
 target := env_var_or_default("TARGET", "dev")
+gateway := env_var_or_default("GATEWAY", "local")
 
 # Include the src directory in PYTHONPATH
 export PYTHONPATH := "src"
@@ -46,7 +47,7 @@ ingest:
 # Run SQLMesh transformations
 transform:
     @echo "Running SQLMesh transformations..."
-    @cd sqlMesh && sqlmesh plan --auto-apply --include-unmodified --create-from prod --no-prompts {{target}}
+    @cd sqlMesh && sqlmesh --gateway {{gateway}} plan --auto-apply --include-unmodified --create-from prod --no-prompts {{target}}
 
 # Run SQLMesh transformations in dry-run mode (no S3 uploads)
 transform_dry_run:
@@ -55,7 +56,7 @@ transform_dry_run:
     @export RAW_DATA_DIR=data/raw
     @python -m pipeline.ingest.run
     @echo "Local ingestion complete"
-    @cd sqlMesh && sqlmesh plan --auto-apply --include-unmodified --create-from prod --no-prompts {{target}}
+    @cd sqlMesh && sqlmesh --gateway {{gateway}} plan --auto-apply --include-unmodified --create-from prod --no-prompts {{target}}
     @echo "Dry-run complete!"
 
 # Run Upload pipeline with optional arguments for sources

@@ -7,7 +7,7 @@ case "$1" in
     ;;
   "transform")
     cd sqlMesh
-    sqlmesh plan --auto-apply --include-unmodified --create-from prod --no-prompts "${TARGET:-dev}"
+    sqlmesh --gateway "${GATEWAY}:-local" plan --auto-apply --include-unmodified --create-from prod --no-prompts "${TARGET:-dev}"
     ;;
   "transform_dry_run")
     export ENABLE_S3_UPLOAD=false
@@ -19,7 +19,7 @@ case "$1" in
     
     echo "Start sqlMesh"
     cd sqlMesh
-    sqlmesh plan --auto-apply --include-unmodified --create-from prod --no-prompts "${TARGET:-dev}"
+    sqlmesh --gateway "${GATEWAY}:-local" plan --auto-apply --include-unmodified --create-from prod --no-prompts "${TARGET:-dev}"
     echo "End sqlMesh"
     ;;
   "upload")
@@ -34,7 +34,7 @@ case "$1" in
     
     echo "Start sqlMesh"
     cd sqlMesh
-    sqlmesh plan --auto-apply --include-unmodified --create-from prod --no-prompts "${TARGET:-dev}"
+    sqlmesh --gateway "${GATEWAY}:-local" plan --auto-apply --include-unmodified --create-from prod --no-prompts "${TARGET:-dev}"
     echo "End sqlMesh"
     
     cd ..

@@ -21,8 +21,8 @@ def parse_fully_qualified_name(fqtn):
 def s3_landing_path(evaluator, subfolder_filename):
     """Construct S3 landing path."""
     bucket = os.environ.get('S3_BUCKET_NAME', 'osaa-mvp')
-    target = os.environ.get('TARGET', 'prod')
-    username = os.environ.get('USERNAME', 'default')
+    target = os.environ.get('TARGET', 'prod').lower()
+    username = os.environ.get('USERNAME', 'default').lower()
 
     # Construct the environment path segment
     env_path = target if target in ['prod', 'int'] else f"{target}_{username}"
@@ -38,8 +38,8 @@ def s3_landing_path(evaluator, subfolder_filename):
 def s3_transformed_path(evaluator, fqtn):
     """Construct S3 transformed path."""
     bucket = os.environ.get('S3_BUCKET_NAME', 'osaa-mvp')
-    target = os.environ.get('TARGET', 'dev')
-    username = os.environ.get('USERNAME', 'default')
+    target = os.environ.get('TARGET', 'dev').lower()
+    username = os.environ.get('USERNAME', 'default').lower()
 
     # Construct the environment path segment
     env_path = target if target in ['prod', 'int'] else f"{target}_{username}"

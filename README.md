@@ -125,6 +125,16 @@ The environment (`<env>`) in S3 paths is determined by configuration:
    S3_BUCKET_NAME=osaa-mvp
    TARGET=dev
    USERNAME=<your-name>
+
+   # SQLMesh Configuration
+   # Postgres for the shared state db
+   POSTGRES_HOST=your_host
+   POSTGRES_PORT=your_port
+   POSTGRES_USER=your_user
+   POSTGRES_PASSWORD=your_pass
+   POSTGRES_DATABASE=your_database
+   # Specify Gateway
+   GATEWAY=your_gateway
    ```
 
    These credentials are used for:
@@ -159,6 +169,7 @@ The pipeline supports different execution environments controlled through enviro
 The main variables that control behavior are:
 - TARGET: Controls both S3 paths and SQLMesh environments (`dev`, `int`, `prod`). Default is `dev`
 - USERNAME: Used for S3 paths in `dev` environment. Default is `default`
+- GATEWAY: Used to specify whether to use a managed postgres database for SQLMesh's state connection. Possible values are `local` or `shared_state`. Default is `local`, which uses duckdb as the state connection. 
 
 ####  Standard Execution
 Run the complete pipeline with default settings:
@@ -210,6 +221,13 @@ docker compose run --rm -e TARGET=prod pipeline etl
 ```
 
 This creates S3 paths like: `s3://osaa-poc/prod/landing/`
+
+4. Run using the shared postgres database as SQLMesh's state connection:
+```bash
+docker compose run --rm -e TARGET=dev -e USERNAME=johndoe -e GATEWAY=shared_state pipeline etl
+```
+
+If you specified your gateway in `.env` file to use a shared database for SQLMesh's state. 
 
 #### Testing Configuration
 To verify your environment settings before running the pipeline:
