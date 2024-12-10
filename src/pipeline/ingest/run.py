@@ -1,59 +1,114 @@
 import os
 import re
 import duckdb
+import boto3
+from botocore.exceptions import ClientError, NoCredentialsError
+
 from pipeline.utils import setup_logger, s3_init
 import pipeline.config as config
 
 # Setup
 logger = setup_logger(__name__)
 
+# Custom Exceptions
+class IngestError(Exception):
+    """Base exception for ingestion process errors."""
+    pass
+
+class S3ConfigurationError(IngestError):
+    """Exception raised for S3 configuration or connection issues."""
+    pass
+
+class FileConversionError(IngestError):
+    """Exception raised for errors during file conversion."""
+    pass
+
 class Ingest:
     def __init__(self):
         """
         Initialize the IngestProcess with DuckDB connection and optionally S3 session.
+        
+        :raises IngestError: If there are issues initializing the ingestion process
         """
-        self.con = duckdb.connect(config.DB_PATH)
-        if config.ENABLE_S3_UPLOAD:
-            self.s3_client, self.session = s3_init(return_session=True)
-        else:
-            logger.info("S3 upload disabled, skipping S3 initialization")
-            self.s3_client = None
-            self.session = None
+        try:
+            # Validate DB path
+            if not os.path.exists(os.path.dirname(config.DB_PATH)):
+                os.makedirs(os.path.dirname(config.DB_PATH), exist_ok=True)
+            
+            self.con = duckdb.connect(config.DB_PATH)
+            
+            if config.ENABLE_S3_UPLOAD:
+                try:
+                    self.s3_client, self.session = s3_init(return_session=True)
+                except Exception as e:
+                    logger.error(f"Failed to initialize S3 client: {e}")
+                    raise S3ConfigurationError(f"S3 initialization failed: {e}")
+            else:
+                logger.info("S3 upload disabled, skipping S3 initialization")
+                self.s3_client = None
+                self.session = None
+        
+        except Exception as e:
+            logger.error(f"Initialization error: {e}")
+            raise IngestError(f"Failed to initialize Ingest process: {e}")
 
     def setup_s3_secret(self):
         """
         Set up the S3 secret in DuckDB for S3 access.
+        
+        :raises S3ConfigurationError: If there are issues setting up S3 secret
         """
         if not config.ENABLE_S3_UPLOAD:
             logger.info("S3 upload disabled, skipping S3 secret setup")
             return
 
         try:
+            # Validate session and credentials
+            if not self.session:
+                raise S3ConfigurationError("No S3 session available")
+
             region = self.session.region_name
             credentials = self.session.get_credentials().get_frozen_credentials()
 
+            # Validate credentials
+            if not all([credentials.access_key, credentials.secret_key, region]):
+                raise S3ConfigurationError("Incomplete S3 credentials")
+
             self.con.sql(f"""
-            CREATE SECRET my_s3_secret (
+            CREATE SECRET IF NOT EXISTS my_s3_secret (
                 TYPE S3,
                 KEY_ID '{credentials.access_key}',
                 SECRET '{credentials.secret_key}',
                 REGION '{region}'
             );
             """)
-            logger.info("S3 secret setup in DuckDB.")
+            logger.info("S3 secret setup in DuckDB successfully.")
 
+        except (NoCredentialsError, ClientError) as e:
+            error_msg = f"AWS Credentials Error: {e}"
+            logger.error(error_msg)
+            raise S3ConfigurationError(error_msg)
         except Exception as e:
-            logger.error(f"Error setting up S3 secret: {e}")
-            raise
+            error_msg = f"Unexpected error setting up S3 secret: {e}"
+            logger.error(error_msg)
+            raise S3ConfigurationError(error_msg)
 
     def convert_csv_to_parquet_and_upload(self, local_file_path: str, s3_file_path: str):
         """
         Convert a CSV file to Parquet and upload it to S3.
-
-        :param local_file_path: Path to the local CSV file.
-        :param s3_file_path: The S3 file path for the output Parquet file.
+        
+        :param local_file_path: Path to the local CSV file
+        :param s3_file_path: Destination S3 path for the Parquet file
+        :raises FileConversionError: If there are issues converting or uploading the file
         """
         try:
+            # Input validation
+            if not os.path.exists(local_file_path):
+                raise FileNotFoundError(f"Local file not found: {local_file_path}")
+            
+            if not local_file_path.lower().endswith('.csv'):
+                raise ValueError(f"Expected CSV file, got: {local_file_path}")
+
             table_name = re.search(r'[^/]+(?=\.)', local_file_path)
             table_name = table_name.group(0).replace('-','_') if table_name else "UNNAMED"
             fully_qualified_name = 'source.' + table_name
@@ -79,9 +134,15 @@ class Ingest:
 
             logger.info(f"Successfully converted and uploaded {local_file_path} to {s3_file_path}")
 
+        except FileNotFoundError as e:
+            logger.error(f"File not found error: {e}")
+            raise FileConversionError(str(e))
+        except ValueError as e:
+            logger.error(f"Invalid file type: {e}")
+            raise FileConversionError(str(e))
         except Exception as e:
-            logger.error(f"Error converting and uploading {local_file_path} to S3: {e}", exc_info=True)
-            raise
+            logger.error(f"Unexpected error in file conversion: {e}")
+            raise FileConversionError(f"Conversion failed: {e}")
 
     def generate_file_to_s3_folder_mapping(self, raw_data_dir: str) -> dict:
         """
@@ -151,14 +212,38 @@ class Ingest:
 
     def run(self):
         """
-        Run the entire ingestion process.
+        Main method to run the ingestion process.
+        
+        :raises IngestError: If the entire ingestion process fails
         """
         try:
-            self.setup_s3_secret()
+            # Setup S3 secret if enabled
+            if config.ENABLE_S3_UPLOAD:
+                self.setup_s3_secret()
+            
+            # Add your specific ingestion logic here
+            logger.info("Ingestion process started")
+            
+            # Example: Process files
+            # You would replace this with your actual file processing logic
             self.convert_and_upload_files()
-        finally:
-            self.con.close()
+            
+            logger.info("Ingestion process completed successfully")
+        
+        except IngestError as e:
+            logger.error(f"Ingestion process failed: {e}")
+            raise
+        except Exception as e:
+            error_msg = f"Unexpected error in ingestion process: {e}"
+            logger.error(error_msg)
+            raise IngestError(error_msg)
 
 if __name__ == '__main__':
-    ingest_process = Ingest()
-    ingest_process.run()
+    try:
+        ingest_process = Ingest()
+        ingest_process.run()
+    except IngestError as e:
+        logger.error(f"Ingestion process failed: {e}")
+        # Optionally, you could add more sophisticated error handling here
+        # such as sending an alert, retrying, or taking corrective action
+        exit(1)
