@@ -10,7 +10,7 @@ flowchart TB
             direction TB
             DDB[(DuckDB Database)]
         end
-        
+
         DCSV --> DIP
         DIP --> DDB
         DDB --> DUP
@@ -19,8 +19,8 @@ flowchart TB
 subgraph "Github"
     direction TB
         PT[Action: Deploy]
-        ST[Action: Run]        
-    
+        ST[Action: Run]
+
     GHCRDB[(Container Registry)]
 end
 
@@ -46,7 +46,7 @@ end
                 IDB --> ITP
             end
         end
-        
+
         subgraph "Prod Container"
             direction LR
             subgraph ETL[run_etl]

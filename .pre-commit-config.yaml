@@ -1,0 +1,86 @@
+repos:
+  # General pre-commit hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: debug-statements
+      - id: requirements-txt-fixer
+
+  # Python code formatting
+  - repo: https://github.com/psf/black
+    rev: 24.1.1
+    hooks:
+      - id: black
+        language_version: python3.11
+        args: [
+          "--line-length=100",
+          "--target-version=py311",
+          "--exclude=\\.venv|\\.git|\\.hg|\\.mypy_cache|\\.tox|build|dist"
+        ]
+
+  # Python import sorting
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: [
+          "--profile=black",
+          "--line-length=100",
+          "--multi-line=3",
+          "--filter-files"
+        ]
+
+  # Python linting
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        additional_dependencies: [
+          'flake8-docstrings',
+          'flake8-bugbear',
+          'pep8-naming'
+        ]
+        args: [
+          "--max-line-length=100",
+          "--extend-ignore=E203,W503",
+          "--exclude=.venv,build,dist",
+          "--docstring-convention=google"
+        ]
+
+  # Static type checking
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        additional_dependencies: [
+          'types-PyYAML',
+          'types-requests',
+          'types-python-dateutil',
+          'types-freezegun'
+        ]
+        args: [
+          "--python-version=3.11",
+          "--warn-return-any",
+          "--warn-unused-configs",
+          "--ignore-missing-imports",
+          "--disallow-untyped-defs",
+          "--check-untyped-defs",
+          "--show-error-codes",
+          "--strict-optional",
+          "--no-implicit-optional"
+        ]
+        exclude: ^(tests/|\.venv/)
+
+  # Security linting
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.6
+    hooks:
+      - id: bandit
+        additional_dependencies: ["bandit[toml]"]
+        args: [
+          "-x", ".venv,tests"
+        ]

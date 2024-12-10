@@ -36,4 +36,3 @@ ORDER BY
   year,
   country_id,
   indicator_id;
-  

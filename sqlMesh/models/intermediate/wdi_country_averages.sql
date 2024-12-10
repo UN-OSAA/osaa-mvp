@@ -9,18 +9,18 @@ WITH source_data AS (
 ),
 
 country_averages AS (
-    SELECT 
+    SELECT
         country_id,
         AVG(CAST(value AS FLOAT)) as avg_value_by_country
     FROM source_data
-    WHERE value IS NOT NULL 
+    WHERE value IS NOT NULL
       AND value != ''
       AND TRY_CAST(value AS FLOAT) IS NOT NULL
     GROUP BY country_id
 ),
 
 final AS (
-    SELECT 
+    SELECT
         s.*,
         ca.avg_value_by_country
     FROM source_data s

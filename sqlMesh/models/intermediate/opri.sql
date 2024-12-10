@@ -14,4 +14,3 @@ SELECT
 FROM opri.data_national AS series
 LEFT JOIN opri.label AS label
   ON series.indicator_id = label.indicator_id;
-  

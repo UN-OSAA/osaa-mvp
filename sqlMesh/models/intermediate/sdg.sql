@@ -14,4 +14,3 @@ SELECT
 FROM sdg.data_national AS series
 LEFT JOIN sdg.label AS label
   ON series.indicator_id = label.indicator_id;
-  

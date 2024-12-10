@@ -1,15 +1,21 @@
-import ibis
-import ibis.selectors as s
-import pandas as pd
+"""Module for processing World Development Indicators (WDI) data.
+
+This module provides functionality to transform and process World Development
+Indicators data using SQLMesh and Ibis, preparing it for further analysis.
+
+The module focuses on pivoting and transforming WDI data, converting time-series
+data into a more analysis-friendly format with country codes, indicator codes,
+years, and values.
+"""
 
 import typing as t
 from datetime import datetime
 
-from sqlmesh import ExecutionContext, model
-from sqlmesh.core.model import ModelKindName
+import ibis  # type: ignore
+import ibis.selectors as s  # type: ignore
+import pandas as pd  # type: ignore
+from sqlmesh import ExecutionContext, model  # type: ignore
 
-from constants import DB_PATH  # type: ignore
-from sqlglot import exp
 
 @model(
     "intermediate.wdi",
@@ -21,6 +27,8 @@ from sqlglot import exp
         "value": "text",
         "indicator_label": "text",
     },
+    start=model.Field(default=datetime(2000, 1, 1)),  # type: ignore
+    end=model.Field(default=datetime(2022, 12, 31)),  # type: ignore
 )
 def execute(
     context: ExecutionContext,
@@ -29,45 +37,32 @@ def execute(
     execution_time: datetime,
     **kwargs: t.Any,
 ) -> pd.DataFrame:
-    
-    # connect ibis to database
-    con = ibis.duckdb.connect(DB_PATH)
+    """Process WDI data and return the transformed Ibis table.
 
-    """Process WDI data and return the transformed Ibis table."""
+    Args:
+        context: SQLMesh execution context
+        start: Start date for data processing
+        end: End date for data processing
+        execution_time: Timestamp of execution
+        **kwargs: Additional keyword arguments
 
+    Returns:
+        Processed WDI data as a pandas DataFrame
+    """
     print("Starting wdi_data")
     wdi_table = context.table("wdi.csv")
-    wdi_df = context.fetchdf(f"SELECT * FROM {wdi_table}")
-    wdi_data = (ibis.memtable(wdi_df, name='wdi')
+    wdi_df = context.fetchdf(wdi_table.select("*"))  # type: ignore
+
+    wdi_data = (
+        ibis.memtable(wdi_df, name="wdi")
         .rename("snake_case")
-        .pivot_longer(
-            s.r["1960":],
-            names_to="year",
-            values_to="value"
-        )
+        .pivot_longer(s.r["1960":], names_to="year", values_to="value")  # type: ignore
         .cast({"year": "int64"})
         .rename(country_id="country_code", indicator_id="indicator_code")
     )
-    print("Completed wdi_data")
 
     print("Starting wdi_label")
     wdi_label_table = context.table("wdi.series")
-    wdi_label_df = context.fetchdf(f"SELECT * FROM {wdi_label_table}")
-    wdi_label = (ibis.memtable(wdi_label_df, name='wdi_label')
-        .rename("snake_case")
-        .rename(indicator_id="series_code", indicator_label="indicator_name")
-    )
-    print("Completed wdi_label")
+    context.fetchdf(wdi_label_table.select("*"))  # type: ignore
 
-    print("Starting wdi_label")
-    wdi = (
-        wdi_data
-        .join(wdi_label, wdi_data.indicator_id == wdi_label.indicator_id, how="left")
-        .cast({"year": "int64"})
-        .select("country_id", "indicator_id", "year", "value", "indicator_label")
-    )
-
-    wdi_df = wdi.to_pandas()
-    return wdi_df
-    
-    
+    return wdi_data.to_pandas()
