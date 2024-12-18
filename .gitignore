@@ -20,6 +20,7 @@ __MACOSX
 sqlMesh/.cache/*
 sqlMesh/logs
 sqlMesh/*.db
+sqlMesh/*.db.wal
 
 *.pyc
 
