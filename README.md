@@ -56,22 +56,8 @@ S3 path examples:
 ## Getting Started
 
 ### User Profiles
-1. **Data Analyst/Policy Analyst** - You are a user of the data, and you need to run the data pipeline in your own development environment. Link to Instructions
-2. **Data Engineer** - You are a project maintainer and you need to make edits to the pipeline process. You will interact directly with the code and cli tools, in addition to the compiling and running the container. Link to Instructions.
-
-
-### Process for Data Analysts
-Please follow this section if your role is Data Analysts. Please see the definition of [Data Analyst](#user-profiles) above for more details.
-
-#### Prerequisites
-- AWS account with S3 access
-- Docker Desktop - for building and running the pipeline in a containerized environment
-- Git cli
-
---- To be completed ---
-
-### Process for Data Engineers
-Please follow this section if your role is Data Engineer. Please see the definition of [Data Engineer](#user-profiles) above for more details.
+1. **Data Analyst/Policy Analyst** - You are a user of the data, and you need to run the data pipeline in your own development environment.
+2. **Data Engineer** - You are a project maintainer and you need to make edits to the pipeline process. You will interact directly with the code and cli tools, in addition to the compiling and running the container.
 
 #### Prerequisites
 - Python 3.9-3.11 (3.12 not supported)

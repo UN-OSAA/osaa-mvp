@@ -1,9 +1,6 @@
 name: Build and Test Container on Push
 
-on:
-  push:
-    branches:
-      - '*'
+on: push
 
 jobs:
   build-and-test-container:
@@ -20,8 +17,23 @@ jobs:
 
     - name: Run Container with Dry Run
       id: run-container
+      env:
+        TARGET: ${{ secrets.TARGET || 'dev' }}
+        GATEWAY: ${{ secrets.GATEWAY || 'shared_state' }}
+        AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION || 'us-east-1' }}
       run: |
-        docker run --name osaa-mvp-test -e TARGET=int osaa-mvp transform_dry_run
+        docker run --name osaa-mvp-test \
+          -e TARGET=$TARGET \
+          -e GATEWAY=$GATEWAY \
+          -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
+          -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
+          -e AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION \
+          -e POSTGRES_HOST=${{ secrets.POSTGRES_HOST }} \
+          -e POSTGRES_PORT=${{ secrets.POSTGRES_PORT }} \
+          -e POSTGRES_USER=${{ secrets.POSTGRES_USER }} \
+          -e POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }} \
+          -e POSTGRES_DATABASE=${{ secrets.POSTGRES_DATABASE }} \
+          osaa-mvp transform_dry_run
       continue-on-error: true
 
     - name: Check Container Logs
