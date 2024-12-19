@@ -147,6 +147,12 @@ docker compose up
 ```
 By default, the container will run the entire elt process `just elt`.
 
+To run the SQLMesh UI:
+```bash
+docker compose --profile ui up ui
+```
+Note: The UI must be run using the profile flag as shown above.
+
 ###### One-off Pipeline Components
 You can run specific parts of the pipeline:
 1. Run only the ingestion process:

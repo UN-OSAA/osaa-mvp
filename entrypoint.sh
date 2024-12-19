@@ -22,6 +22,10 @@ case "$1" in
     sqlmesh --gateway "${GATEWAY:-local}" plan --auto-apply --include-unmodified --create-from prod --no-prompts "${TARGET:-dev}"
     echo "End sqlMesh"
     ;;
+  "ui")
+    cd sqlMesh
+    sqlmesh ui --port "${UI_PORT:-8000}"
+    ;;
   "upload")
     python -m pipeline.upload.run
     ;;
@@ -53,6 +57,7 @@ case "$1" in
     echo "  transform    - Run SQLMesh transformations"
     echo "  upload       - Run the data upload process"
     echo "  etl          - Run the complete pipeline (ingest + transform + upload)"
+    echo "  ui           - Start the SQLMesh UI server"
     echo "  config_test  - Test and display current configuration settings"
     echo
     echo "Usage: docker compose run pipeline <command>"
