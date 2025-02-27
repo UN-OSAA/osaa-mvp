@@ -1,19 +1,16 @@
-"""Test module for configuration settings and utilities.
+"""Configuration testing module.
 
-This module contains unit tests for configuration-related
-functions and utilities in the United Nations OSAA MVP project.
+This module validates the configuration settings for the OSAA MVP project
+to ensure all required directories, environment variables, and settings are correct.
 """
 
-import logging
 import os
+import sys
+import logging
+from pipeline.logging_config import create_logger
+from pipeline import config
 
-import pipeline.config as config
-
-# Set up logging
-logger = logging.getLogger(__name__)
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logger = create_logger(__name__)
 
 
 def test_configuration() -> None:
@@ -37,7 +34,7 @@ def test_configuration() -> None:
             logger.warning(f"   ❌ {name}: {directory} does NOT exist")
 
     # Test Environment Variables
-    logger.info("🌐 Validating Environment Settings")
+    logger.info("📊 Validating Environment Settings")
     env_checks = [
         ("Target Environment", config.TARGET, ["dev", "prod", "int"]),
         ("Username", config.USERNAME, None),
@@ -46,9 +43,7 @@ def test_configuration() -> None:
 
     for name, value, valid_options in env_checks:
         if valid_options and value not in valid_options:
-            logger.warning(
-                f"   ⚠️ {name}: {value} is not in expected options {valid_options}"
-            )
+            logger.warning(f"   ⚠️ {name}: {value} is not in expected options {valid_options}")
         else:
             logger.info(f"   ✅ {name}: {value}")
 
@@ -67,15 +62,13 @@ def test_configuration() -> None:
             logger.warning(f"   ❌ {name}: No value configured")
 
     # Test Database Configuration
-    logger.info("🗃️ Validating Database Configuration")
+    logger.info("🗄️ Validating Database Configuration")
     if os.path.exists(os.path.dirname(config.DB_PATH)):
-        logger.info(f"   ✅ Database Path: {config.DB_PATH}")
+        logger.info(f"   ✅ DB Path: {config.DB_PATH}")
     else:
-        logger.warning(
-            f"   ❌ Database Path Directory: {os.path.dirname(config.DB_PATH)} does NOT exist"
-        )
+        logger.warning(f"   ❌ Database Path Directory: {os.path.dirname(config.DB_PATH)} does NOT exist")
 
-    logger.info("✨ Configuration Validation Complete")
+    logger.info("✅ Configuration Validation Complete")
 
 
 # Run the configuration test when the script is executed

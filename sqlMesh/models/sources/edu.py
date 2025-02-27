@@ -1,18 +1,11 @@
 """Module for processing educational data from various datasets.
 
 This module provides functionality to process and transform educational data
-from different sources such as OPRI and SDG. It includes methods for joining
-data tables, filtering, and preparing the data for further analysis.
-
-Key features:
-- Process educational data from multiple tables
-- Join data and label tables
-- Filter data based on year
-- Add metadata to the processed dataset
+from different sources such as OPRI and SDG.
 """
 
 import logging
-from typing import Optional
+from pipeline.logging_config import create_logger
 
 import ibis
 

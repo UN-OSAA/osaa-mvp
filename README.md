@@ -27,7 +27,6 @@ Here's how to get started with the OSAA Data Pipeline:
 3. **Run the Pipeline**
    ```bash
    # Run the complete pipeline
-   docker compose run --rm pipeline ingest
    docker compose run --rm pipeline etl
    ```
 
@@ -38,6 +37,12 @@ Here's how to get started with the OSAA Data Pipeline:
 
    # Run only transformations
    docker compose run --rm pipeline transform
+   
+   # Run a configuration test
+   docker compose run --rm pipeline config_test
+   
+   # Promote data (from dev to prod)
+   docker compose run --rm pipeline promote
 
    # Run in development mode with your username
    docker compose run --rm -e USERNAME=your_name pipeline etl
@@ -249,14 +254,14 @@ osaa-mvp/
 │       ├── upload/           # Handles DuckDB transformed data upload to S3
 │       ├── s3_sync/          # Handles SQLMesh database files sync with S3
 │       ├── s3_promote/       # Handles data promotion between environments
+│       ├── utils/            # Utility functions and modules
 │       ├── catalog.py        # Defines data catalog interactions
 │       ├── config.py         # Stores configuration details
-│       ├── utils.py          # Utility functions
+│       ├── utils.py          # Utility functions (to be migrated to utils/)
 ├── .env_example              # Environment variables template
 ├── dockerfile                # Docker container definition
 ├── docker-compose.yml        # Docker services configuration
 ├── entrypoint.sh             # Docker container entry point script
-├── justfile                  # Task automation for local execution
 └── requirements.txt          # Python package dependencies
 ```
 

@@ -5,8 +5,9 @@ into the United Nations OSAA MVP project data pipeline.
 """
 
 import logging
+from pipeline.logging_config import create_logger
 
-logger = logging.getLogger(__name__)
+logger = create_logger(__name__)
 
 
 def init_ingest_package() -> None:

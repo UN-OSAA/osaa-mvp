@@ -5,8 +5,9 @@ including downloading and uploading operations.
 """
 
 import logging
+from pipeline.logging_config import create_logger
 
-logger = logging.getLogger(__name__)
+logger = create_logger(__name__)
 
 def init_s3_sync_package() -> None:
     """Initialize the s3_sync package and log package details."""

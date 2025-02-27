@@ -82,16 +82,16 @@ class Ingest:
             return
 
         try:
-            logger.info("🔐 Setting up S3 Secret in DuckDB")
-            logger.info("   Creating S3 secret with assumed credentials")
+            logger.info("Setting up S3 Secret in DuckDB")
+            logger.info("Creating S3 secret with assumed credentials")
 
             region = self.session.region_name
             credentials = self.session.get_credentials().get_frozen_credentials()
-            logger.info(f"   Using AWS region: {region}")
+            logger.info(f"Using AWS region: {region}")
 
             # Drop existing secret if it exists
             self.con.sql("DROP SECRET IF EXISTS my_s3_secret")
-            logger.info("   Dropped existing S3 secret")
+            logger.info("Dropped existing S3 secret")
 
             # Create the SQL statement
             sql_statement = f"""
@@ -104,7 +104,7 @@ class Ingest:
                 );
             """
             self.con.sql(sql_statement)
-            logger.info("✅ S3 secret successfully created in DuckDB")
+            logger.info("S3 secret created in DuckDB")
 
         except Exception as e:
             error_msg = f"AWS Credentials Error: {e}"
@@ -140,37 +140,29 @@ class Ingest:
                 FROM read_csv('{local_file_path}', header = true)
             """
             )
-            logger.info(f"Successfully created table {fully_qualified_name}")
+            logger.info(f"Table {fully_qualified_name} created")
 
             # Verify table was created and has data
             try:
                 row_count = self.con.sql(f"SELECT COUNT(*) FROM {fully_qualified_name}").fetchone()[0]
-                logger.info(f"Table {fully_qualified_name} created with {row_count} rows")
+                logger.info(f"Table {fully_qualified_name} has {row_count} rows")
             except Exception as e:
                 logger.error(f"Failed to get row count for table {fully_qualified_name}: {e}")
                 raise FileConversionError(f"Failed to verify table creation: {e}")
 
             # Attempt S3 upload
-            logger.info(f"Attempting to upload to S3: {s3_file_path}")
+            logger.info(f"Uploading to S3: {s3_file_path}")
             copy_sql = f"""
-                COPY (SELECT * FROM {fully_qualified_name})
-                TO '{s3_file_path}'
-                (FORMAT PARQUET)
+                COPY (
+                    SELECT * FROM read_csv_auto('{local_file_path}')
+                ) TO '{s3_file_path}' (FORMAT PARQUET);
             """
             self.con.sql(copy_sql)
+            logger.info(f"Successfully processed: {local_file_path} -> {s3_file_path}")
 
-            logger.info(
-                f"Successfully converted and uploaded {local_file_path} to {s3_file_path}"
-            )
-
-        except FileNotFoundError as e:
-            logger.error(f"File not found error: {e}")
-            raise FileConversionError(str(e))
         except Exception as e:
-            logger.error(f"Unexpected error: {e}")
-            logger.error(f"Error type: {type(e).__name__}")
-            logger.error(f"Error details: {str(e)}")
-            raise FileConversionError(f"Conversion failed: {e}")
+            logger.error(f"Error during conversion/upload: {e}")
+            raise FileConversionError(f"Conversion/upload failed: {e}")
 
     def generate_file_to_s3_folder_mapping(self, raw_data_dir: str) -> dict:
         """
@@ -231,7 +223,7 @@ class Ingest:
                 else:
                     logger.warning(f"File not found: {local_file_path}")
 
-            logger.info("Ingestion process completed successfully.")
+            logger.info("Ingestion process completed.")
 
         except Exception as e:
             logger.error(f"❌ Error during file ingestion: {e}")
