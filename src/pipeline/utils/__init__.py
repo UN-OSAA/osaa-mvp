@@ -4,6 +4,7 @@ This module contains utility functions and scripts used across the pipeline.
 """
 
 from pipeline.logging_config import create_logger
+from pipeline.utils.s3_helpers import s3_init
 
 logger = create_logger(__name__)
 
