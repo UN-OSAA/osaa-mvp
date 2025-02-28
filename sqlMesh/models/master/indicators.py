@@ -2,8 +2,9 @@ import ibis
 import os
 from sqlmesh.core.macros import MacroEvaluator
 from sqlmesh.core.model import model
-from macros.ibis_expressions import generate_ibis_table
-from macros.utils import find_indicator_models
+from macros.utils import generate_ibis_table, find_indicator_models
+import typing as t
+from typing import Optional, Dict, Union, Any
 
 COLUMN_SCHEMA = {
     "indicator_id": "String",
@@ -61,7 +62,7 @@ def entrypoint(evaluator: MacroEvaluator) -> str:
                     print(f"Warning: Module {module_name} does not have COLUMN_SCHEMA, using default")
                     column_schema = DEFAULT_COLUMN_SCHEMA
 
-                # Generate table for this source
+                # Generate table for this source - will always return an ibis Table object now
                 table = generate_ibis_table(
                     evaluator,
                     table_name=source,
@@ -69,8 +70,7 @@ def entrypoint(evaluator: MacroEvaluator) -> str:
                     column_schema=column_schema,
                 )
                 
-                # Our improved generate_ibis_table always returns an ibis table object,
-                # so we don't need to check for strings anymore
+                # Add the table to our list
                 tables.append(table.mutate(source=ibis.literal(source)))
             except ImportError:
                 print(f"Warning: Could not import module: {module_name}")
