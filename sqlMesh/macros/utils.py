@@ -5,6 +5,8 @@ import os
 from sqlmesh.core.macros import macro, MacroEvaluator
 from sqlglot import exp
 import typing as t
+import ibis
+from ibis.expr.operations.relations import UnboundTable, Namespace
 
 
 def _convert_duckdb_type_to_ibis(duckdb_type):
@@ -190,3 +192,77 @@ def find_indicator_models(
         raise RuntimeError(f"An error occurred while finding indicator models: {e}")
 
     return indicator_models
+
+
+def generate_ibis_table(
+    evaluator: t.Any, 
+    table_name: str, 
+    schema_name: t.Optional[str] = None, 
+    column_schema: t.Optional[t.Dict[str, str]] = None,
+    catalog_name: str = "unosaa_data_pipeline"
+) -> t.Union[ibis.expr.types.Table, str]:
+    """Generate an Ibis table object for the given table.
+    
+    Args:
+        evaluator: SQLMesh evaluator
+        table_name: Name of the table
+        schema_name: Schema name (optional)
+        column_schema: Column schema mapping column names to types
+        catalog_name: Catalog name (default: "unosaa_data_pipeline")
+        
+    Returns:
+        An Ibis table object representing the table
+    """
+    if not column_schema:
+        raise ValueError(f"Column schema is required for table {table_name}")
+    
+    full_table_name = f"{schema_name}.{table_name}" if schema_name else table_name
+    
+    try:
+        # First try to query the actual table from the database
+        con = ibis.connect("duckdb:///app/sqlMesh/data/db/sqlmesh.db")
+        
+        try:
+            # Try to access the table
+            sql = f"SELECT * FROM {full_table_name} LIMIT 1"
+            table = con.sql(sql)
+            
+            # If successful, retrieve all rows
+            sql = f"SELECT * FROM {full_table_name}"
+            table = con.sql(sql)
+            
+            # Cast columns to ensure correct types
+            casted_columns = {}
+            for col_name, col_type in column_schema.items():
+                if col_name in table.columns:
+                    casted_columns[col_name] = table[col_name].cast(col_type).name(col_name)
+                else:
+                    casted_columns[col_name] = ibis.literal(None).cast(col_type).name(col_name)
+            
+            return table.select(list(casted_columns.values()))
+        
+        except Exception as e:
+            print(f"Warning: Could not access table {full_table_name}: {str(e)}")
+            
+            # If querying the database fails, create an empty in-memory table with the correct schema
+            empty_table = UnboundTable(
+                name=table_name,
+                schema=column_schema,
+                namespace=Namespace(catalog=catalog_name, database=schema_name)
+            ).to_expr()
+            
+            # Add dummy row with NULL values and filter it out to create an empty table with schema
+            return empty_table.filter(ibis.literal(False))
+    
+    except Exception as e:
+        print(f"Error creating ibis table for {full_table_name}: {str(e)}")
+        
+        # Last resort - create a dummy table with literals
+        # We should never reach this point with the improved error handling
+        empty_table = UnboundTable(
+            name=table_name,
+            schema=column_schema,
+            namespace=Namespace(catalog=catalog_name, database=schema_name)
+        ).to_expr()
+        
+        return empty_table.filter(ibis.literal(False))

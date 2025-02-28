@@ -69,13 +69,8 @@ def entrypoint(evaluator: MacroEvaluator) -> str:
                     column_schema=column_schema,
                 )
                 
-                # If we got a SQL string back instead of an ibis table,
-                # this means the table doesn't exist yet - skip it
-                if isinstance(table, str):
-                    print(f"Warning: Table for {source} doesn't exist yet, skipping")
-                    continue
-                    
-                # Add source column
+                # Our improved generate_ibis_table always returns an ibis table object,
+                # so we don't need to check for strings anymore
                 tables.append(table.mutate(source=ibis.literal(source)))
             except ImportError:
                 print(f"Warning: Could not import module: {module_name}")
