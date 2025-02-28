@@ -8,13 +8,12 @@ import logging
 import os
 import sys
 
-from pipeline.logging_config import create_logger, configure_logging
+from pipeline.logging_config import create_logger
 
 # Initialize logging
 logger = create_logger(__name__)
 
-# Call configuration function
-configure_logging()
+# No need to call configure_logging as it doesn't exist
 
 def init_pipeline_package() -> None:
     """Initialize the pipeline package and log package details."""
