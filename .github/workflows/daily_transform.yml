@@ -29,7 +29,20 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Install AWS CLI
+        run: |
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip -q awscliv2.zip
+          sudo ./aws/install
+          
+          # Quick check AWS connection
+          aws sts get-caller-identity || echo "Warning: AWS authentication issue"
+          
+          # Create artifacts directory
+          mkdir -p artifacts
+
       - name: Run Docker ETL Command
+        id: etl_run
         env:
           TARGET: prod
           GATEWAY: local
@@ -40,6 +53,18 @@ jobs:
           S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
           USERNAME: ${{ secrets.USERNAME || 'osaa-mvp-user' }}
         run: |
+          echo "Starting ETL process..."
+          
+          # Check for and download database file if needed
+          echo "Checking for database file in S3 buckets..."
+          aws s3 ls s3://$S3_BUCKET_NAME/ --recursive | grep -i "\.db$" || echo "No DB files in main bucket"
+          aws s3 ls s3://dev-unosaa-data-pipeline/ --recursive | grep -i "\.db$" || echo "No DB files in dev bucket"
+          
+          # Try to download the database file
+          mkdir -p ./sqlMesh
+          aws s3 cp s3://dev-unosaa-data-pipeline/osaa_mvp.db ./sqlMesh/osaa_mvp.db || echo "Could not download database file"
+          
+          # Run the ETL process with logging
           docker run --rm \
             -e TARGET=$TARGET \
             -e GATEWAY=$GATEWAY \
@@ -49,5 +74,66 @@ jobs:
             -e AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION \
             -e S3_BUCKET_NAME=$S3_BUCKET_NAME \
             -e USERNAME=$USERNAME \
+            -v $(pwd)/sqlMesh:/app/sqlMesh \
             ghcr.io/un-osaa/osaa-mvp:latest \
-            etl prod 
+            etl prod | tee artifacts/etl_output.log
+          
+          # Save the exit code
+          ETL_EXIT_CODE=${PIPESTATUS[0]}
+          echo "ETL process exited with code: $ETL_EXIT_CODE"
+          
+          # Check the contents of the sqlMesh directory
+          echo "Contents of sqlMesh directory:" | tee -a artifacts/etl_output.log
+          ls -la ./sqlMesh/ | tee -a artifacts/etl_output.log
+          
+          exit $ETL_EXIT_CODE
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: etl-logs
+          path: artifacts/
+          retention-days: 5
+
+      - name: Notify on failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "🚨 ETL Job Failed 🚨",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*ETL Pipeline Failure*\n⚠️ The daily ETL job has failed. <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View the logs>"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Repository:*\n${{ github.repository }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Workflow:*\n${{ github.workflow }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Triggered By:*\n${{ github.event_name }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Run ID:*\n${{ github.run_id }}"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK 

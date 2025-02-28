@@ -21,12 +21,36 @@ jobs:
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
+      
+    - name: Install AWS CLI
+      run: |
+        curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+        unzip -q awscliv2.zip
+        sudo ./aws/install
+        
+        # Quick AWS check
+        aws sts get-caller-identity || echo "Warning: AWS authentication issue"
+        
+        # Create artifacts directory
+        mkdir -p artifacts
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
     - name: Build Docker Container
-      run: docker build -t osaa-mvp .
+      run: |
+        echo "Building Docker container..."
+        docker build -t osaa-mvp .
+        echo "Docker build complete"
+
+    - name: Check S3 State Before Promotion
+      run: |
+        echo "Checking S3 buckets before promotion..."
+        aws s3 ls s3://$S3_BUCKET_NAME/dev/ > artifacts/s3_before.log 2>&1 || echo "Could not list dev directory"
+        aws s3 ls s3://$S3_BUCKET_NAME/prod/ > artifacts/s3_prod_before.log 2>&1 || echo "Could not list prod directory"
+        
+        # Look for database file
+        aws s3 ls s3://dev-unosaa-data-pipeline/ --recursive | grep -i "\.db$" || echo "No database files found in dev bucket"
 
     - name: Run Container with Promote
       id: run-container
@@ -37,39 +61,65 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME || 'osaa-mvp' }}
       run: |
+        echo "Starting S3 promotion process..."
+        
+        # Try to download database file if needed
+        mkdir -p ./sqlMesh
+        aws s3 cp s3://dev-unosaa-data-pipeline/osaa_mvp.db ./sqlMesh/osaa_mvp.db || echo "Could not download database file"
+        
+        # Run the container for promotion
         docker run --name osaa-mvp \
           -e AWS_ROLE_ARN=$AWS_ROLE_ARN \
           -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
           -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
           -e AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION \
           -e S3_BUCKET_NAME=$S3_BUCKET_NAME \
-          osaa-mvp promote
+          -v $(pwd)/sqlMesh:/app/sqlMesh \
+          osaa-mvp promote | tee artifacts/promote_output.log
+        
+        echo "Promotion process finished. Checking status..."
 
     - name: Check Container Status
       run: |
         container_status=$(docker inspect --format='{{.State.Status}}' osaa-mvp)
         exit_code=$(docker inspect --format='{{.State.ExitCode}}' osaa-mvp)
-        error_log=$(docker logs osaa-mvp 2>&1)
         
         echo "Container Status: $container_status"
         echo "Exit Code: $exit_code"
         
+        # Save container logs
+        docker logs osaa-mvp > artifacts/container_logs.txt 2>&1
+        
         if [ "$container_status" != "exited" ]; then
           echo "Error: Container did not complete execution"
-          echo "$error_log"
           exit 1
         fi
         
         if [ "$exit_code" -ne 0 ]; then
-          echo "Error: Container exited with non-zero status code"
-          echo "$error_log"
+          echo "Error: Container exited with non-zero status code: $exit_code"
           exit 1
         fi
         
-        echo "Container ran successfully"
+        echo "Container ran successfully with exit code: $exit_code"
+
+    - name: Check S3 State After Promotion
+      if: always()
+      run: |
+        echo "Checking S3 buckets after promotion..."
+        aws s3 ls s3://$S3_BUCKET_NAME/dev/ > artifacts/s3_after.log 2>&1 || echo "Could not list dev directory"
+        aws s3 ls s3://$S3_BUCKET_NAME/prod/ > artifacts/s3_prod_after.log 2>&1 || echo "Could not list prod directory"
 
     - name: Cleanup
       if: always()
       run: |
+        echo "Cleaning up..."
         docker stop osaa-mvp || true
         docker rm osaa-mvp || true
+
+    - name: Upload artifacts
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: promotion-logs
+        path: artifacts/
+        retention-days: 5
