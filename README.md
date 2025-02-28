@@ -176,6 +176,30 @@ To add a new dataset:
 
 3. **Add a transformation model**
    - Create a transformation model (if needed) in SQLMesh using Ibis. Add the model to the same folder as the source model above.
+   - For Python-based transformation models, we recommend using the `generate_ibis_table` utility:
+   
+   ```python
+   # Import the table generation utility
+   from macros.ibis_expressions import generate_ibis_table
+   
+   # Example transformation model
+   @model(...)
+   def entrypoint(evaluator: MacroEvaluator) -> str:
+       # Generate the Ibis table expression
+       source_data = generate_ibis_table(
+           evaluator,
+           table_name="your_table",
+           column_schema=get_sql_model_schema(...),
+           schema_name="your_schema"
+       )
+       
+       # Add your transformation logic here
+       # ...
+       
+       return ibis.to_sql(transformed_data)
+   ```
+   
+   - This utility simplifies working with SQLMesh and Ibis by handling table expression generation consistently. It helps prevent common integration issues and allows you to focus on your transformation logic.
 
 4. **Run the Pipeline**
    ```bash
