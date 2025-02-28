@@ -1,6 +1,6 @@
 """Pipeline package for data processing and management.
 
-This package contains modules for data ingestion, upload, and utility functions
+This package contains modules for data ingestion and utility functions
 used in the United Nations OSAA MVP project.
 """
 
@@ -42,7 +42,6 @@ def init_pipeline_package() -> None:
     logger.info("   🌐 United Nations OSAA MVP Data Processing Pipeline")
     logger.info("   📦 Modules:")
     logger.info("      • Data Ingestion")
-    logger.info("      • Data Upload")
     logger.info("      • Utility Functions")
 
     # Log package path for debugging
