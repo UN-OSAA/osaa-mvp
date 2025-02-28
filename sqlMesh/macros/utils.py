@@ -201,8 +201,7 @@ def generate_ibis_table(
     table_name: str, 
     schema_name: t.Optional[str] = None, 
     column_schema: t.Optional[t.Dict[str, str]] = None,
-    catalog_name: str = "unosaa_data_pipeline",
-    max_retries: int = 5
+    catalog_name: str = "unosaa_data_pipeline"
 ) -> ibis.expr.types.Table:
     """Generate an Ibis table object for the given table.
     
@@ -212,67 +211,51 @@ def generate_ibis_table(
         schema_name: Schema name (optional)
         column_schema: Column schema mapping column names to types
         catalog_name: Catalog name (default: "unosaa_data_pipeline")
-        max_retries: Maximum number of retries for database lock issues
         
     Returns:
-        An Ibis table object representing the table (never a string)
+        An Ibis table object representing the table
     """
     if not column_schema:
         raise ValueError(f"Column schema is required for table {table_name}")
     
     full_table_name = f"{schema_name}.{table_name}" if schema_name else table_name
     
-    # Create an empty table with the specified schema - will be returned as fallback
+    # Create an empty table with the specified schema
     empty_table = UnboundTable(
         name=table_name,
         schema=column_schema,
         namespace=Namespace(catalog=catalog_name, database=schema_name)
     ).to_expr()
     
-    # Multiple database paths to try
-    db_paths = [
-        "/app/sqlMesh/unosaa_data_pipeline.db", 
-        "/app/sqlMesh/data/db/sqlmesh.db"
-    ]
+    db_path = "/app/sqlMesh/unosaa_data_pipeline.db"
     
-    for retry in range(max_retries):
-        for db_path in db_paths:
-            try:
-                if not os.path.exists(db_path):
-                    continue
-                    
-                # Connect to database with a timeout to prevent indefinite hanging
-                con = ibis.connect(f"duckdb://{db_path}")
-                
-                try:
-                    # Try to access the table
-                    sql = f"SELECT * FROM {full_table_name}"
-                    table = con.sql(sql)
-                    
-                    # Cast columns to ensure correct types
-                    casted_columns = {}
-                    for col_name, col_type in column_schema.items():
-                        if col_name in table.columns:
-                            casted_columns[col_name] = table[col_name].cast(col_type).name(col_name)
-                        else:
-                            casted_columns[col_name] = ibis.literal(None).cast(col_type).name(col_name)
-                    
-                    return table.select(list(casted_columns.values()))
-                
-                except Exception as e:
-                    print(f"Warning: Could not access table {full_table_name}: {str(e)}")
-                    # Continue to the next database or retry
+    try:
+        if not os.path.exists(db_path):
+            print(f"Database not found at {db_path}, returning empty table")
+            return empty_table.filter(ibis.literal(False))
             
-            except Exception as e:
-                print(f"Warning: Database connection error for {db_path}: {str(e)}")
+        # Connect to database
+        con = ibis.connect(f"duckdb://{db_path}")
         
-        # If we reach here, all database paths failed on this retry
-        # Add exponential backoff with jitter before retrying
-        if retry < max_retries - 1:
-            sleep_time = (2 ** retry) + random.random()
-            print(f"Retrying database connection in {sleep_time:.2f} seconds...")
-            time.sleep(sleep_time)
+        try:
+            # Try to access the table
+            sql = f"SELECT * FROM {full_table_name}"
+            table = con.sql(sql)
+            
+            # Cast columns to ensure correct types
+            casted_columns = {}
+            for col_name, col_type in column_schema.items():
+                if col_name in table.columns:
+                    casted_columns[col_name] = table[col_name].cast(col_type).name(col_name)
+                else:
+                    casted_columns[col_name] = ibis.literal(None).cast(col_type).name(col_name)
+            
+            return table.select(list(casted_columns.values()))
+        
+        except Exception as e:
+            print(f"Could not access table {full_table_name}: {str(e)}")
+            return empty_table.filter(ibis.literal(False))
     
-    # If all retries fail, return the empty table
-    print(f"All database connection attempts failed for {full_table_name}, returning empty table")
-    return empty_table.filter(ibis.literal(False))
+    except Exception as e:
+        print(f"Database connection error: {str(e)}")
+        return empty_table.filter(ibis.literal(False))

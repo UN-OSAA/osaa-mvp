@@ -39,88 +39,47 @@ def entrypoint(evaluator: MacroEvaluator) -> str:
     """
     Create a unified indicators table from all indicator sources.
     """
-    try:
-        indicator_models = find_indicator_models(
-            [
-                "opri",
-                "sdg",
-                "wdi",
-            ]
-        )
+    indicator_models = find_indicator_models(
+        [
+            "opri",
+            "sdg",
+            "wdi",
+        ]
+    )
 
-        # Import each model and get its table
-        tables = []
-        for source, module_name in indicator_models:
+    # Import each model and get its table
+    tables = []
+    for source, module_name in indicator_models:
+        try:
+            # Dynamically import the module
+            module = __import__(module_name, fromlist=["COLUMN_SCHEMA"])
+
+            # Get column schema, use default if not available
             try:
-                # Dynamically import the module
-                module = __import__(module_name, fromlist=["COLUMN_SCHEMA"])
+                column_schema = module.COLUMN_SCHEMA
+            except AttributeError:
+                print(f"Warning: Module {module_name} does not have COLUMN_SCHEMA, using default")
+                column_schema = DEFAULT_COLUMN_SCHEMA
 
-                # Get column schema, use default if not available
-                try:
-                    column_schema = module.COLUMN_SCHEMA
-                except AttributeError:
-                    print(f"Warning: Module {module_name} does not have COLUMN_SCHEMA, using default")
-                    column_schema = DEFAULT_COLUMN_SCHEMA
-
-                # Generate table for this source - will always return an ibis Table object now
-                table = generate_ibis_table(
-                    evaluator,
-                    table_name=source,
-                    schema_name="sources",
-                    column_schema=column_schema,
-                )
-                
-                # Add the table to our list
-                tables.append(table.mutate(source=ibis.literal(source)))
-            except ImportError:
-                print(f"Warning: Could not import module: {module_name}")
-            except Exception as e:
-                print(f"Warning: Error processing {module_name}: {str(e)}")
-
-        # Union all tables
-        if not tables:
-            # Return an empty result set with the correct schema if no tables were found
-            columns = []
-            for col_name, col_type in COLUMN_SCHEMA.items():
-                # Map ibis types to SQL types
-                if col_type in ["String"]:
-                    sql_type = "VARCHAR"
-                elif col_type in ["Int", "Int64"]:
-                    sql_type = "INTEGER"
-                elif col_type in ["Decimal"]:
-                    sql_type = "DECIMAL(18,3)"
-                else:
-                    sql_type = "VARCHAR"
-                
-                # Add the column to the list
-                columns.append(f"CAST(NULL AS {sql_type}) AS {col_name}")
+            # Generate table for this source
+            table = generate_ibis_table(
+                evaluator,
+                table_name=source,
+                schema_name="sources",
+                column_schema=column_schema,
+            )
             
-            # Create a SQL query that returns an empty result set with the correct schema
-            return f"SELECT {', '.join(columns)} WHERE 1=0"
+            # Add the table to our list
+            tables.append(table.mutate(source=ibis.literal(source)))
+        except ImportError:
+            print(f"Warning: Could not import module: {module_name}")
+        except Exception as e:
+            print(f"Warning: Error processing {module_name}: {str(e)}")
 
-        unioned_t = ibis.union(*tables).order_by(["year", "country_id", "indicator_id"])
-        return ibis.to_sql(unioned_t)
-    except Exception as e:
-        # If there's an error, return an empty table with the correct schema
-        columns = []
-        for col_name, col_type in COLUMN_SCHEMA.items():
-            # Map ibis types to SQL types
-            if col_type in ["String"]:
-                sql_type = "VARCHAR"
-            elif col_type in ["Int", "Int64"]:
-                sql_type = "INTEGER"
-            elif col_type in ["Decimal"]:
-                sql_type = "DECIMAL(18,3)"
-            else:
-                sql_type = "VARCHAR"
-            
-            # Add the column to the list
-            columns.append(f"CAST(NULL AS {sql_type}) AS {col_name}")
-        
-        # Log the error
-        print(f"Error in master indicators: {str(e)}")
-        
-        # Create a SQL query that returns an empty result set with the correct schema
-        query = f"SELECT {', '.join(columns)} WHERE 1=0"
-        
-        return query
+    # Union all tables
+    if not tables:
+        # Return an empty result set with the correct schema if no tables were found
+        return "SELECT NULL AS indicator_id, NULL AS country_id, NULL AS year, NULL AS value, NULL AS magnitude, NULL AS qualifier, NULL AS indicator_description, NULL AS source WHERE 1=0"
+
+    unioned_t = ibis.union(*tables).order_by(["year", "country_id", "indicator_id"])
+    return ibis.to_sql(unioned_t)
