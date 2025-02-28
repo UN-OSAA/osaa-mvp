@@ -24,13 +24,34 @@ COLUMN_SCHEMA = {
     columns=COLUMN_SCHEMA
 )
 def entrypoint(evaluator: MacroEvaluator) -> str:
+    """Calculate country averages for WDI indicators."""
+    # Get the WDI table
     wdi = generate_ibis_table(
         evaluator,
         table_name="wdi",
         schema_name="sources",
         column_schema=WDI_COLUMN_SCHEMA,
     )
+    
+    # If we got a string back (empty table SQL), just return it
+    if isinstance(wdi, str):
+        # Modify the SQL to include all our columns including avg_value_by_country
+        columns = []
+        for col_name, col_type in COLUMN_SCHEMA.items():
+            if col_type in ["String"]:
+                sql_type = "VARCHAR"
+            elif col_type in ["Int", "Int64"]:
+                sql_type = "INTEGER"
+            elif col_type in ["Decimal"]:
+                sql_type = "DECIMAL(18,3)"
+            elif col_type in ["Float"]:
+                sql_type = "FLOAT"
+            else:
+                sql_type = "VARCHAR"
+            columns.append(f"CAST(NULL AS {sql_type}) AS {col_name}")
+        return f"SELECT {', '.join(columns)} WHERE 1=0"
 
+    # Otherwise, calculate country averages
     country_averages = (
         wdi.filter(wdi.value.notnull())
         .group_by(["country_id", "indicator_id"])

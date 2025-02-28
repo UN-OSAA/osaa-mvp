@@ -5,6 +5,7 @@ from different sources such as OPRI and SDG.
 """
 
 import logging
+from typing import Optional
 from pipeline.logging_config import create_logger
 
 import ibis
