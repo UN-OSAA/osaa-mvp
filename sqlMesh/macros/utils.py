@@ -79,7 +79,7 @@ def s3_read(
 
     Returns:
         S3 path as SQLGlot string literal
-        Example: 's3://bucket/dev/dev_user/landing/edu/OPRI_LABEL.parquet'
+        Example: 's3://bucket/dev/landing/edu/OPRI_LABEL.parquet'
 
     Environment:
         S3_BUCKET_NAME (str): Bucket name (default: "unosaa-data-pipeline")
@@ -87,12 +87,17 @@ def s3_read(
     """
     bucket = os.environ.get("S3_BUCKET_NAME", "unosaa-data-pipeline")
     target = os.environ.get("TARGET", "dev").lower()
+    username = os.environ.get("USERNAME", "")
 
     # Convert input to string if it's a SQLGlot expression
     if isinstance(subfolder_filename, exp.Expression):
         subfolder_filename = str(subfolder_filename).strip("'")
 
+    # Check if there are actual files at the direct target path (the format the ingest uses)
     path = f"s3://{bucket}/{target}/landing/{subfolder_filename}.parquet"
+    
+    print(f"Looking for S3 file at: {path}")
+    
     return exp.Literal.string(path)
 
 
