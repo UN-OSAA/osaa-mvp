@@ -18,6 +18,9 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION || 'us-east-1' }}
       S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
+      DEV_S3_BUCKET_NAME: ${{ secrets.DEV_S3_BUCKET_NAME || 'dev-unosaa-data-pipeline' }}
+      DB_FILENAME: ${{ secrets.DB_FILENAME || 'osaa_mvp.db' }}
+      SQLMESH_DIR: sqlmesh_data
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
@@ -33,6 +36,7 @@ jobs:
         
         # Create artifacts directory
         mkdir -p artifacts
+        mkdir -p $SQLMESH_DIR
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
@@ -50,7 +54,42 @@ jobs:
         aws s3 ls s3://$S3_BUCKET_NAME/prod/ > artifacts/s3_prod_before.log 2>&1 || echo "Could not list prod directory"
         
         # Look for database file
-        aws s3 ls s3://dev-unosaa-data-pipeline/ --recursive | grep -i "\.db$" || echo "No database files found in dev bucket"
+        aws s3 ls s3://$DEV_S3_BUCKET_NAME/ --recursive | grep -i "\.db$" || echo "No database files found in dev bucket"
+
+    - name: Run Create External Models Step
+      id: create_external_models
+      env:
+        AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION || 'us-east-1' }}
+        AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME || 'osaa-mvp' }}
+      run: |
+        echo "Running create_external_models to handle unbound tables..."
+        
+        # Try to find and download the database file from either bucket
+        if aws s3 ls s3://$S3_BUCKET_NAME/ --recursive | grep -i "$DB_FILENAME"; then
+          echo "Found database in main bucket"
+          aws s3 cp s3://$S3_BUCKET_NAME/$DB_FILENAME $SQLMESH_DIR/$DB_FILENAME || echo "Could not download database file from main bucket"
+        elif aws s3 ls s3://$DEV_S3_BUCKET_NAME/ --recursive | grep -i "$DB_FILENAME"; then
+          echo "Found database in dev bucket"
+          aws s3 cp s3://$DEV_S3_BUCKET_NAME/$DB_FILENAME $SQLMESH_DIR/$DB_FILENAME || echo "Could not download database file from dev bucket"
+        else
+          echo "Database file not found in any bucket"
+        fi
+        
+        # Run the create_external_models command
+        docker run --rm --name osaa-mvp-external-models \
+          -e AWS_ROLE_ARN=$AWS_ROLE_ARN \
+          -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+          -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+          -e AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION \
+          -e S3_BUCKET_NAME=$S3_BUCKET_NAME \
+          -v $(pwd)/$SQLMESH_DIR:/app/sqlMesh \
+          osaa-mvp \
+          python -m sqlmesh create_external_models | tee artifacts/create_external_models.log
+        
+        echo "Create external models step completed"
 
     - name: Run Container with Promote
       id: run-container
@@ -63,9 +102,20 @@ jobs:
       run: |
         echo "Starting S3 promotion process..."
         
-        # Try to download database file if needed
-        mkdir -p ./sqlMesh
-        aws s3 cp s3://dev-unosaa-data-pipeline/osaa_mvp.db ./sqlMesh/osaa_mvp.db || echo "Could not download database file"
+        # Check if database exists from previous step
+        if [ ! -f "$SQLMESH_DIR/$DB_FILENAME" ]; then
+          echo "Database file not found from previous step, attempting to download again..."
+          
+          if aws s3 ls s3://$S3_BUCKET_NAME/ --recursive | grep -i "$DB_FILENAME"; then
+            echo "Found database in main bucket"
+            aws s3 cp s3://$S3_BUCKET_NAME/$DB_FILENAME $SQLMESH_DIR/$DB_FILENAME || echo "Could not download database file"
+          elif aws s3 ls s3://$DEV_S3_BUCKET_NAME/ --recursive | grep -i "$DB_FILENAME"; then
+            echo "Found database in dev bucket"
+            aws s3 cp s3://$DEV_S3_BUCKET_NAME/$DB_FILENAME $SQLMESH_DIR/$DB_FILENAME || echo "Could not download database file"
+          else
+            echo "Database file not found in any bucket"
+          fi
+        fi
         
         # Run the container for promotion
         docker run --name osaa-mvp \
@@ -74,7 +124,7 @@ jobs:
           -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
           -e AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION \
           -e S3_BUCKET_NAME=$S3_BUCKET_NAME \
-          -v $(pwd)/sqlMesh:/app/sqlMesh \
+          -v $(pwd)/$SQLMESH_DIR:/app/sqlMesh \
           osaa-mvp promote | tee artifacts/promote_output.log
         
         echo "Promotion process finished. Checking status..."
