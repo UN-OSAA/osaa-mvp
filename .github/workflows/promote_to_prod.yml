@@ -18,78 +18,15 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION || 'us-east-1' }}
       S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
-      DEV_S3_BUCKET_NAME: ${{ secrets.DEV_S3_BUCKET_NAME || 'dev-unosaa-data-pipeline' }}
-      DB_FILENAME: ${{ secrets.DB_FILENAME || 'osaa_mvp.db' }}
-      SQLMESH_DIR: sqlmesh_data
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
-      
-    - name: Install AWS CLI
-      run: |
-        curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-        unzip -q awscliv2.zip
-        sudo ./aws/install
-        
-        # Quick AWS check
-        aws sts get-caller-identity || echo "Warning: AWS authentication issue"
-        
-        # Create artifacts directory
-        mkdir -p artifacts
-        mkdir -p $SQLMESH_DIR
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
     - name: Build Docker Container
-      run: |
-        echo "Building Docker container..."
-        docker build -t osaa-mvp .
-        echo "Docker build complete"
-
-    - name: Check S3 State Before Promotion
-      run: |
-        echo "Checking S3 buckets before promotion..."
-        aws s3 ls s3://$S3_BUCKET_NAME/dev/ > artifacts/s3_before.log 2>&1 || echo "Could not list dev directory"
-        aws s3 ls s3://$S3_BUCKET_NAME/prod/ > artifacts/s3_prod_before.log 2>&1 || echo "Could not list prod directory"
-        
-        # Look for database file
-        aws s3 ls s3://$DEV_S3_BUCKET_NAME/ --recursive | grep -i "\.db$" || echo "No database files found in dev bucket"
-
-    - name: Run Create External Models Step
-      id: create_external_models
-      env:
-        AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION || 'us-east-1' }}
-        AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME || 'osaa-mvp' }}
-      run: |
-        echo "Running create_external_models to handle unbound tables..."
-        
-        # Try to find and download the database file from either bucket
-        if aws s3 ls s3://$S3_BUCKET_NAME/ --recursive | grep -i "$DB_FILENAME"; then
-          echo "Found database in main bucket"
-          aws s3 cp s3://$S3_BUCKET_NAME/$DB_FILENAME $SQLMESH_DIR/$DB_FILENAME || echo "Could not download database file from main bucket"
-        elif aws s3 ls s3://$DEV_S3_BUCKET_NAME/ --recursive | grep -i "$DB_FILENAME"; then
-          echo "Found database in dev bucket"
-          aws s3 cp s3://$DEV_S3_BUCKET_NAME/$DB_FILENAME $SQLMESH_DIR/$DB_FILENAME || echo "Could not download database file from dev bucket"
-        else
-          echo "Database file not found in any bucket"
-        fi
-        
-        # Run the create_external_models command
-        docker run --rm --name osaa-mvp-external-models \
-          -e AWS_ROLE_ARN=$AWS_ROLE_ARN \
-          -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
-          -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
-          -e AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION \
-          -e S3_BUCKET_NAME=$S3_BUCKET_NAME \
-          -v $(pwd)/$SQLMESH_DIR:/app/sqlMesh \
-          osaa-mvp \
-          python -m sqlmesh create_external_models | tee artifacts/create_external_models.log
-        
-        echo "Create external models step completed"
+      run: docker build -t osaa-mvp .
 
     - name: Run Container with Promote
       id: run-container
@@ -100,76 +37,39 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME || 'osaa-mvp' }}
       run: |
-        echo "Starting S3 promotion process..."
-        
-        # Check if database exists from previous step
-        if [ ! -f "$SQLMESH_DIR/$DB_FILENAME" ]; then
-          echo "Database file not found from previous step, attempting to download again..."
-          
-          if aws s3 ls s3://$S3_BUCKET_NAME/ --recursive | grep -i "$DB_FILENAME"; then
-            echo "Found database in main bucket"
-            aws s3 cp s3://$S3_BUCKET_NAME/$DB_FILENAME $SQLMESH_DIR/$DB_FILENAME || echo "Could not download database file"
-          elif aws s3 ls s3://$DEV_S3_BUCKET_NAME/ --recursive | grep -i "$DB_FILENAME"; then
-            echo "Found database in dev bucket"
-            aws s3 cp s3://$DEV_S3_BUCKET_NAME/$DB_FILENAME $SQLMESH_DIR/$DB_FILENAME || echo "Could not download database file"
-          else
-            echo "Database file not found in any bucket"
-          fi
-        fi
-        
-        # Run the container for promotion
         docker run --name osaa-mvp \
           -e AWS_ROLE_ARN=$AWS_ROLE_ARN \
           -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
           -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
           -e AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION \
           -e S3_BUCKET_NAME=$S3_BUCKET_NAME \
-          -v $(pwd)/$SQLMESH_DIR:/app/sqlMesh \
-          osaa-mvp promote | tee artifacts/promote_output.log
-        
-        echo "Promotion process finished. Checking status..."
+          osaa-mvp promote
 
     - name: Check Container Status
       run: |
         container_status=$(docker inspect --format='{{.State.Status}}' osaa-mvp)
         exit_code=$(docker inspect --format='{{.State.ExitCode}}' osaa-mvp)
+        error_log=$(docker logs osaa-mvp 2>&1)
         
         echo "Container Status: $container_status"
         echo "Exit Code: $exit_code"
         
-        # Save container logs
-        docker logs osaa-mvp > artifacts/container_logs.txt 2>&1
-        
         if [ "$container_status" != "exited" ]; then
           echo "Error: Container did not complete execution"
+          echo "$error_log"
           exit 1
         fi
         
         if [ "$exit_code" -ne 0 ]; then
-          echo "Error: Container exited with non-zero status code: $exit_code"
+          echo "Error: Container exited with non-zero status code"
+          echo "$error_log"
           exit 1
         fi
         
-        echo "Container ran successfully with exit code: $exit_code"
-
-    - name: Check S3 State After Promotion
-      if: always()
-      run: |
-        echo "Checking S3 buckets after promotion..."
-        aws s3 ls s3://$S3_BUCKET_NAME/dev/ > artifacts/s3_after.log 2>&1 || echo "Could not list dev directory"
-        aws s3 ls s3://$S3_BUCKET_NAME/prod/ > artifacts/s3_prod_after.log 2>&1 || echo "Could not list prod directory"
+        echo "Container ran successfully"
 
     - name: Cleanup
       if: always()
       run: |
-        echo "Cleaning up..."
         docker stop osaa-mvp || true
         docker rm osaa-mvp || true
-
-    - name: Upload artifacts
-      if: always()
-      uses: actions/upload-artifact@v3
-      with:
-        name: promotion-logs
-        path: artifacts/
-        retention-days: 5

@@ -15,12 +15,9 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION || 'us-east-1' }}
       S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
-      DEV_S3_BUCKET_NAME: ${{ secrets.DEV_S3_BUCKET_NAME || 'dev-unosaa-data-pipeline' }}
       TARGET: prod
       USERNAME: ${{ secrets.USERNAME || 'osaa-mvp-user' }}
       GATEWAY: local
-      DB_FILENAME: ${{ secrets.DB_FILENAME || 'osaa_mvp.db' }}
-      SQLMESH_DIR: sqlmesh_data
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -32,67 +29,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install AWS CLI
-        run: |
-          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-          unzip -q awscliv2.zip
-          sudo ./aws/install
-          
-          # Quick check AWS connection
-          aws sts get-caller-identity || echo "Warning: AWS authentication issue"
-          
-          # Create artifacts directory
-          mkdir -p artifacts
-          mkdir -p $SQLMESH_DIR
-
-      - name: Run Create External Models Step
-        id: create_external_models
-        env:
-          TARGET: prod
-          GATEWAY: local
-          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION || 'us-east-1' }}
-          AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
-          USERNAME: ${{ secrets.USERNAME || 'osaa-mvp-user' }}
-        run: |
-          echo "Running create_external_models to handle unbound tables..."
-          
-          # Check for and download database file if needed
-          echo "Checking for database file in S3 buckets..."
-          aws s3 ls s3://$S3_BUCKET_NAME/ --recursive | grep -i "\.db$" || echo "No DB files in main bucket"
-          aws s3 ls s3://$DEV_S3_BUCKET_NAME/ --recursive | grep -i "\.db$" || echo "No DB files in dev bucket"
-          
-          # Try to find and download the database file from either bucket
-          if aws s3 ls s3://$S3_BUCKET_NAME/ --recursive | grep -i "$DB_FILENAME"; then
-            echo "Found database in main bucket"
-            aws s3 cp s3://$S3_BUCKET_NAME/$DB_FILENAME $SQLMESH_DIR/$DB_FILENAME || echo "Could not download database file from main bucket"
-          elif aws s3 ls s3://$DEV_S3_BUCKET_NAME/ --recursive | grep -i "$DB_FILENAME"; then
-            echo "Found database in dev bucket"
-            aws s3 cp s3://$DEV_S3_BUCKET_NAME/$DB_FILENAME $SQLMESH_DIR/$DB_FILENAME || echo "Could not download database file from dev bucket"
-          else
-            echo "Database file not found in any bucket"
-          fi
-          
-          # Run the create_external_models command
-          docker run --rm \
-            -e TARGET=$TARGET \
-            -e GATEWAY=$GATEWAY \
-            -e AWS_ROLE_ARN=$AWS_ROLE_ARN \
-            -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
-            -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
-            -e AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION \
-            -e S3_BUCKET_NAME=$S3_BUCKET_NAME \
-            -e USERNAME=$USERNAME \
-            -v $(pwd)/$SQLMESH_DIR:/app/sqlMesh \
-            ghcr.io/un-osaa/osaa-mvp:latest \
-            python -m sqlmesh create_external_models | tee artifacts/create_external_models.log
-          
-          echo "Create external models step completed"
-
       - name: Run Docker ETL Command
-        id: etl_run
         env:
           TARGET: prod
           GATEWAY: local
@@ -103,24 +40,6 @@ jobs:
           S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
           USERNAME: ${{ secrets.USERNAME || 'osaa-mvp-user' }}
         run: |
-          echo "Starting ETL process..."
-          
-          # Check for and download database file if needed (in case previous step failed)
-          if [ ! -f "$SQLMESH_DIR/$DB_FILENAME" ]; then
-            echo "Database file not found from previous step, attempting to download again..."
-            
-            if aws s3 ls s3://$S3_BUCKET_NAME/ --recursive | grep -i "$DB_FILENAME"; then
-              echo "Found database in main bucket"
-              aws s3 cp s3://$S3_BUCKET_NAME/$DB_FILENAME $SQLMESH_DIR/$DB_FILENAME || echo "Could not download database file"
-            elif aws s3 ls s3://$DEV_S3_BUCKET_NAME/ --recursive | grep -i "$DB_FILENAME"; then
-              echo "Found database in dev bucket"
-              aws s3 cp s3://$DEV_S3_BUCKET_NAME/$DB_FILENAME $SQLMESH_DIR/$DB_FILENAME || echo "Could not download database file"
-            else
-              echo "Database file not found in any bucket"
-            fi
-          fi
-          
-          # Run the ETL process with logging
           docker run --rm \
             -e TARGET=$TARGET \
             -e GATEWAY=$GATEWAY \
@@ -130,24 +49,5 @@ jobs:
             -e AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION \
             -e S3_BUCKET_NAME=$S3_BUCKET_NAME \
             -e USERNAME=$USERNAME \
-            -v $(pwd)/$SQLMESH_DIR:/app/sqlMesh \
             ghcr.io/un-osaa/osaa-mvp:latest \
-            etl prod | tee artifacts/etl_output.log
-          
-          # Save the exit code
-          ETL_EXIT_CODE=${PIPESTATUS[0]}
-          echo "ETL process exited with code: $ETL_EXIT_CODE"
-          
-          # Check the contents of the sqlMesh directory
-          echo "Contents of sqlMesh directory:" | tee -a artifacts/etl_output.log
-          ls -la $SQLMESH_DIR/ | tee -a artifacts/etl_output.log
-          
-          exit $ETL_EXIT_CODE
-
-      - name: Upload artifacts
-        if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: etl-logs
-          path: artifacts/
-          retention-days: 5 
+            etl prod 
