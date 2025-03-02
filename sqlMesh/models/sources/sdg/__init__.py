@@ -1,3 +1,1 @@
-"""
-SQLMesh models for SDG data.
-""" 
+"""SDG data indicators package.""" 

@@ -1,3 +1,1 @@
-"""
-SQLMesh models for WDI data.
-""" 
+"""World Development Indicators data package.""" 

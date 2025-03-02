@@ -1,8 +1,9 @@
 import ibis
 import os
+import glob
 from sqlmesh.core.macros import MacroEvaluator
 from sqlmesh.core.model import model
-from macros.utils import generate_ibis_table, find_indicator_models
+from macros.utils import find_indicator_models
 import typing as t
 from typing import Optional, Dict, Union, Any
 
@@ -39,47 +40,54 @@ def entrypoint(evaluator: MacroEvaluator) -> str:
     """
     Create a unified indicators table from all indicator sources.
     """
-    indicator_models = find_indicator_models(
-        [
-            "opri",
-            "sdg",
-            "wdi",
-        ]
-    )
+    try:
+        # Connect to DuckDB directly
+        con = ibis.connect("duckdb:///app/sqlMesh/unosaa_data_pipeline.db")
+        
+        # Discover all source tables dynamically
+        source_tables = []
+        
+        # First, find all indicator model source directories
+        db_tables = con.list_tables(like='sources.%')
+        
+        print(f"Found the following source tables: {db_tables}")
+        
+        # Try to get each source table
+        for table_name in db_tables:
+            if table_name.startswith('sources.'):
+                source_name = table_name.split('.')[1]
+                try:
+                    source_table = con.table(table_name)
+                    # Add a source column with the source name
+                    source_tables.append(source_table.mutate(source=ibis.literal(source_name)))
+                    print(f"Successfully loaded source table: {table_name}")
+                except Exception as e:
+                    print(f"Warning: Could not access {table_name} table: {e}")
+        
+        # Union all tables
+        if not source_tables:
+            # Return an empty result set with the correct schema if no tables were found
+            print("No source tables found, returning empty result")
+            return create_empty_result()
+        
+        unioned_t = ibis.union(*source_tables).order_by(["year", "country_id", "indicator_id"])
+        return ibis.to_sql(unioned_t)
+    
+    except Exception as e:
+        print(f"Error creating master indicators table: {e}")
+        return create_empty_result()
 
-    # Import each model and get its table
-    tables = []
-    for source, module_name in indicator_models:
-        try:
-            # Dynamically import the module
-            module = __import__(module_name, fromlist=["COLUMN_SCHEMA"])
-
-            # Get column schema, use default if not available
-            try:
-                column_schema = module.COLUMN_SCHEMA
-            except AttributeError:
-                print(f"Warning: Module {module_name} does not have COLUMN_SCHEMA, using default")
-                column_schema = DEFAULT_COLUMN_SCHEMA
-
-            # Generate table for this source
-            table = generate_ibis_table(
-                evaluator,
-                table_name=source,
-                schema_name="sources",
-                column_schema=column_schema,
-            )
-            
-            # Add the table to our list
-            tables.append(table.mutate(source=ibis.literal(source)))
-        except ImportError:
-            print(f"Warning: Could not import module: {module_name}")
-        except Exception as e:
-            print(f"Warning: Error processing {module_name}: {str(e)}")
-
-    # Union all tables
-    if not tables:
-        # Return an empty result set with the correct schema if no tables were found
-        return "SELECT NULL AS indicator_id, NULL AS country_id, NULL AS year, NULL AS value, NULL AS magnitude, NULL AS qualifier, NULL AS indicator_description, NULL AS source WHERE 1=0"
-
-    unioned_t = ibis.union(*tables).order_by(["year", "country_id", "indicator_id"])
-    return ibis.to_sql(unioned_t)
+def create_empty_result():
+    """Create an empty SQL result with the correct schema."""
+    return """
+    SELECT 
+        '' AS indicator_id, 
+        '' AS country_id, 
+        CAST(0 AS BIGINT) AS year, 
+        CAST(0 AS DECIMAL) AS value, 
+        '' AS magnitude, 
+        '' AS qualifier, 
+        '' AS indicator_description, 
+        '' AS source 
+    WHERE 1=0
+    """

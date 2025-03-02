@@ -1,3 +1,1 @@
-"""
-SQLMesh models for OPRI data.
-""" 
+"""OPRI data indicators package.""" 
