@@ -12,8 +12,7 @@ numpy==1.26.4  # Pinning to numpy 1.x for compatibility
 pandas<3.0.0  # Ensuring pandas is compatible with numpy 1.x
 python-dotenv>=1.0.1
 s3fs>=2024.2.0
-ipython>=8.10.0  # Specifically adding IPython to fix import issues
-ipywidgets>=8.0.0  # Ensuring compatible ipywidgets version
+ipywidgets>=8.0.0  # Required for IPython/SQLMesh compatibility
 
 # Database Connections
 psycopg2-binary==2.9.9
