@@ -21,14 +21,6 @@ COLUMN_SCHEMA = {
 
 SQLMESH_DIR = '/app/sqlMesh'
 
-def _convert_duckdb_type_to_ibis(duckdb_type):
-    type_str = str(duckdb_type).upper()
-    base_type = type_str.split("(")[0].strip()
-    type_mapping = {'TEXT': 'String', 'VARCHAR': 'String', 'CHAR': 'String',
-        'INT': 'Int', 'INTEGER': 'Int', 'BIGINT': 'Int', 'DECIMAL':
-        'Decimal', 'NUMERIC': 'Decimal'}
-    return type_mapping.get(base_type, 'String')
-
 @model(
     "sources.wdi",
     is_sql=True,
