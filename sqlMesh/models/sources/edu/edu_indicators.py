@@ -76,7 +76,13 @@ def entrypoint(evaluator: MacroEvaluator) -> str:
         # Union all edu tables if we have any
         if not source_tables:
             # Return an empty result set with the correct schema
-            return create_empty_result(evaluator.model.columns)
+            return create_empty_result({
+                "country_id": "String",
+                "indicator_id": "String",
+                "year": "Int",
+                "value": "Decimal",
+                "indicator_description": "String",
+            })
             
         unioned_t = ibis.union(*source_tables)
         return ibis.to_sql(unioned_t)
@@ -84,4 +90,10 @@ def entrypoint(evaluator: MacroEvaluator) -> str:
     except Exception as e:
         # If any error occurs, return an empty table with the right schema
         print(f"Error processing educational data: {e}")
-        return create_empty_result(evaluator.model.columns) 
+        return create_empty_result({
+            "country_id": "String",
+            "indicator_id": "String",
+            "year": "Int",
+            "value": "Decimal",
+            "indicator_description": "String",
+        }) 

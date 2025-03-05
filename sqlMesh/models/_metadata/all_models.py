@@ -56,4 +56,12 @@ def entrypoint(evaluator: MacroEvaluator) -> str:
         return ibis.to_sql(t)
     except Exception as e:
         print(f"Error accessing database: {str(e)}")
-        return create_empty_result(evaluator.model.columns)
+        return create_empty_result({
+            "model_name": "String",
+            "model_description": "String",
+            "model_kind": "String",
+            "grain": "String",
+            "columns": "String",
+            "column_descriptions": "String",
+            "physical_properties": "String",
+        })

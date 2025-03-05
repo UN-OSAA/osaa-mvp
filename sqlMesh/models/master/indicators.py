@@ -52,11 +52,29 @@ def entrypoint(evaluator: MacroEvaluator) -> str:
         if not source_tables:
             # Return an empty result set with the correct schema if no tables were found
             print("No source tables found, returning empty result")
-            return create_empty_result(evaluator.model.columns)
+            return create_empty_result({
+                "indicator_id": "String",
+                "country_id": "String",
+                "year": "Int64",
+                "value": "Decimal",
+                "magnitude": "String",
+                "qualifier": "String",
+                "indicator_description": "String",
+                "source": "String",
+            })
         
         unioned_t = ibis.union(*source_tables).order_by(["year", "country_id", "indicator_id"])
         return ibis.to_sql(unioned_t)
     
     except Exception as e:
         print(f"Error creating master indicators table: {e}")
-        return create_empty_result(evaluator.model.columns)
+        return create_empty_result({
+            "indicator_id": "String",
+            "country_id": "String",
+            "year": "Int64",
+            "value": "Decimal",
+            "magnitude": "String",
+            "qualifier": "String",
+            "indicator_description": "String",
+            "source": "String",
+        })

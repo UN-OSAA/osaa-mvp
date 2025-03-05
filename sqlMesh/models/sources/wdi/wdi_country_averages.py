@@ -51,4 +51,13 @@ def entrypoint(evaluator: MacroEvaluator) -> str:
     except Exception as e:
         # If any error occurs, return an empty table with the right schema
         print(f"Error processing WDI country averages: {e}")
-        return create_empty_result(evaluator.model.columns)
+        return create_empty_result({
+            "country_id": "String",
+            "indicator_id": "String",
+            "year": "Int",
+            "value": "Decimal",
+            "magnitude": "String",
+            "qualifier": "String",
+            "indicator_description": "String",
+            "avg_value_by_country": "Float",
+        })
