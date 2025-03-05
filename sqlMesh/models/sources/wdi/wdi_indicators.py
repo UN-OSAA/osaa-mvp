@@ -8,6 +8,7 @@ from sqlglot import exp
 import typing as t
 from typing import Optional, Dict, Union, Any
 import ibis.selectors as s
+from constants import DB_PATH
 
 SQLMESH_DIR = '/app/sqlMesh'
 
@@ -32,7 +33,7 @@ def entrypoint(evaluator: MacroEvaluator) -> str:
     
     try:
         # Connect to DuckDB
-        con = ibis.connect("duckdb:///app/sqlMesh/unosaa_data_pipeline.db")
+        con = ibis.connect(f"duckdb://{DB_PATH}")
         
         # Try to get the tables directly
         csv_table = con.table("wdi.csv")
