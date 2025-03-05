@@ -9,23 +9,21 @@ import typing as t
 from typing import Optional, Dict, Union, Any
 import ibis.selectors as s
 
-COLUMN_SCHEMA = {
-    "country_id": "String",
-    "indicator_id": "String",
-    "year": "Int",
-    "value": "Decimal",
-    "magnitude": "String",
-    "qualifier": "String",
-    "indicator_description": "String",
-}
-
 SQLMESH_DIR = '/app/sqlMesh'
 
 @model(
     "sources.wdi",
     is_sql=True,
     kind="FULL",
-    columns=COLUMN_SCHEMA
+    columns={
+        "country_id": "String",
+        "indicator_id": "String",
+        "year": "Int",
+        "value": "Decimal",
+        "magnitude": "String",
+        "qualifier": "String",
+        "indicator_description": "String",
+    }
 )
 def entrypoint(evaluator: MacroEvaluator) -> str:
     """Process WDI data and return the transformed Ibis table."""
