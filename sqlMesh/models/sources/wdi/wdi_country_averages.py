@@ -2,6 +2,7 @@ from sqlmesh.core.macros import MacroEvaluator
 from sqlmesh import model
 import ibis
 from constants import DB_PATH
+from macros.utils import create_empty_result
 
 @model(
     "sources.wdi_country_averages",
@@ -50,16 +51,4 @@ def entrypoint(evaluator: MacroEvaluator) -> str:
     except Exception as e:
         # If any error occurs, return an empty table with the right schema
         print(f"Error processing WDI country averages: {e}")
-        empty_df_sql = """
-        SELECT 
-            '' AS country_id,
-            '' AS indicator_id,
-            0 AS year,
-            0.0 AS value,
-            '' AS magnitude,
-            '' AS qualifier,
-            '' AS indicator_description,
-            0.0 AS avg_value_by_country
-        WHERE 1=0
-        """
-        return empty_df_sql
+        return create_empty_result(evaluator.model.columns)

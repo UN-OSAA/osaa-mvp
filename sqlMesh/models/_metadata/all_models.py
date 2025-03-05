@@ -2,7 +2,7 @@ import ibis
 from sqlmesh.core.macros import MacroEvaluator
 from sqlmesh.core.model import model
 from constants import DB_PATH
-import os
+from macros.utils import create_empty_result
 
 
 @model(
@@ -30,14 +30,8 @@ def entrypoint(evaluator: MacroEvaluator) -> str:
     Run `sqlmesh create_external_models` and / or make sure that the model '"osaa_mvp"."_metadata"."all_models"' can be rendered at parse time. (renderer.py:540)
     ```
     """
-    db_path = DB_PATH
-    
     try:
-        if not os.path.exists(db_path):
-            print(f"Database not found at {db_path}")
-            return "SELECT 1 WHERE 1=0"  # Return empty result
-            
-        con = ibis.connect(f"duckdb://{db_path}")
+        con = ibis.connect(f"duckdb://{DB_PATH}")
         
         query = """
             SELECT
@@ -62,4 +56,4 @@ def entrypoint(evaluator: MacroEvaluator) -> str:
         return ibis.to_sql(t)
     except Exception as e:
         print(f"Error accessing database: {str(e)}")
-        return "SELECT 1 WHERE 1=0"  # Return empty result
+        return create_empty_result(evaluator.model.columns)

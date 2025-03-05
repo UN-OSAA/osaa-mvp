@@ -4,15 +4,12 @@ This module manages configuration settings and environment-specific
 parameters for the United Nations OSAA MVP project.
 """
 
-import logging
 import os
 import sys
-
 import boto3
-import colorlog
 from botocore.exceptions import ClientError
-
 from pipeline.exceptions import ConfigurationError
+from pipeline.logging_config import create_logger
 
 # get the local root directory
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))

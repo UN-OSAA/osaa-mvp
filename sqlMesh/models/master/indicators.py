@@ -1,11 +1,7 @@
 import ibis
-import os
-import glob
 from sqlmesh.core.macros import MacroEvaluator
 from sqlmesh.core.model import model
-from macros.utils import find_indicator_models
-import typing as t
-from typing import Optional, Dict, Union, Any
+from macros.utils import find_indicator_models, create_empty_result
 from constants import DB_PATH
 
 @model(
@@ -56,26 +52,11 @@ def entrypoint(evaluator: MacroEvaluator) -> str:
         if not source_tables:
             # Return an empty result set with the correct schema if no tables were found
             print("No source tables found, returning empty result")
-            return create_empty_result()
+            return create_empty_result(evaluator.model.columns)
         
         unioned_t = ibis.union(*source_tables).order_by(["year", "country_id", "indicator_id"])
         return ibis.to_sql(unioned_t)
     
     except Exception as e:
         print(f"Error creating master indicators table: {e}")
-        return create_empty_result()
-
-def create_empty_result():
-    """Create an empty SQL result with the correct schema."""
-    return """
-    SELECT 
-        '' AS indicator_id, 
-        '' AS country_id, 
-        CAST(0 AS BIGINT) AS year, 
-        CAST(0 AS DECIMAL) AS value, 
-        '' AS magnitude, 
-        '' AS qualifier, 
-        '' AS indicator_description, 
-        '' AS source 
-    WHERE 1=0
-    """
+        return create_empty_result(evaluator.model.columns)

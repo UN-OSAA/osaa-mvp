@@ -259,3 +259,29 @@ def generate_ibis_table(
     except Exception as e:
         print(f"Database connection error: {str(e)}")
         return empty_table.filter(ibis.literal(False))
+
+
+def create_empty_result(schema: t.Dict[str, str]) -> str:
+    """Create an empty SQL result with the correct schema.
+    
+    Args:
+        schema: Dictionary mapping column names to their types
+        
+    Returns:
+        SQL query that returns an empty result set with the correct schema
+    """
+    columns = []
+    for col_name, col_type in schema.items():
+        if col_type == "String":
+            columns.append(f"'' AS {col_name}")
+        elif col_type == "Int" or col_type == "Int64":
+            columns.append(f"CAST(0 AS BIGINT) AS {col_name}")
+        elif col_type == "Decimal":
+            columns.append(f"CAST(0 AS DECIMAL) AS {col_name}")
+        else:
+            columns.append(f"'' AS {col_name}")
+    
+    return f"""
+    SELECT {', '.join(columns)}
+    WHERE 1=0
+    """

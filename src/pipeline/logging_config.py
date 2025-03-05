@@ -10,7 +10,6 @@ import os
 import sys
 import traceback
 from typing import Optional, Union
-
 import colorlog
 
 

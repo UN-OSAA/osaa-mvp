@@ -7,9 +7,8 @@ from different sources such as OPRI and SDG.
 import ibis
 from sqlmesh.core.macros import MacroEvaluator
 from sqlmesh import model
-import logging
-from typing import Optional
 from constants import DB_PATH
+from macros.utils import create_empty_result
 
 @model(
     "sources.edu",
@@ -77,7 +76,7 @@ def entrypoint(evaluator: MacroEvaluator) -> str:
         # Union all edu tables if we have any
         if not source_tables:
             # Return an empty result set with the correct schema
-            return create_empty_result()
+            return create_empty_result(evaluator.model.columns)
             
         unioned_t = ibis.union(*source_tables)
         return ibis.to_sql(unioned_t)
@@ -85,16 +84,4 @@ def entrypoint(evaluator: MacroEvaluator) -> str:
     except Exception as e:
         # If any error occurs, return an empty table with the right schema
         print(f"Error processing educational data: {e}")
-        return create_empty_result()
-
-def create_empty_result():
-    """Create an empty SQL result with the correct schema."""
-    return """
-    SELECT 
-        '' AS country_id,
-        '' AS indicator_id,
-        0 AS year,
-        0.0 AS value,
-        '' AS indicator_description
-    WHERE 1=0
-    """ 
+        return create_empty_result(evaluator.model.columns) 

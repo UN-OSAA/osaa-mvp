@@ -1,16 +1,8 @@
 import ibis
-import re
 from sqlmesh.core.macros import MacroEvaluator
 from sqlmesh import model
-from macros.ibis_expressions import generate_ibis_table
-from macros.utils import get_sql_model_schema
-from sqlglot import exp
-import typing as t
-from typing import Optional, Dict, Union, Any
-import ibis.selectors as s
 from constants import DB_PATH
-
-SQLMESH_DIR = '/app/sqlMesh'
+from macros.utils import create_empty_result
 
 @model(
     "sources.opri",
