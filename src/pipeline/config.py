@@ -7,6 +7,8 @@ parameters for the United Nations OSAA MVP project.
 import os
 import sys
 import boto3
+import colorlog
+import logging
 from botocore.exceptions import ClientError
 from pipeline.exceptions import ConfigurationError
 from pipeline.logging_config import create_logger
@@ -50,46 +52,8 @@ class ConfigurationError(Exception):
     pass
 
 
-# Logging configuration
-def create_logger():
-    """
-    Create a structured, color-coded logger with clean output.
-
-    :return: Configured logger instance
-    """
-    # Create logger
-    logger = colorlog.getLogger(__name__)
-    logger.setLevel(logging.INFO)
-    logger.propagate = False
-
-    # Remove any existing handlers
-    for handler in logger.handlers[:]:
-        logger.removeHandler(handler)
-
-    # Create console handler
-    console_handler = colorlog.StreamHandler()
-
-    # Custom log format with clear structure
-    formatter = colorlog.ColoredFormatter(
-        # Structured format with clear sections
-        "%(log_color)s[%(levelname)s]%(reset)s %(blue)s[%(name)s]%(reset)s %(message)s",
-        log_colors={
-            "DEBUG": "cyan",
-            "INFO": "green",
-            "WARNING": "yellow",
-            "ERROR": "red",
-            "CRITICAL": "red,bg_white",
-        },
-        secondary_log_colors={},
-    )
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
-
-    return logger
-
-
 # Global logger instance
-logger = create_logger()
+logger = create_logger(__name__)
 
 
 def validate_config():
