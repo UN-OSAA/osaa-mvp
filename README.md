@@ -136,6 +136,34 @@ docker compose run --rm pipeline ingest    # Only ingest new data
 docker compose run --rm pipeline transform # Only run transformations
 ```
 
+#### Development Workflow
+The pipeline supports flexible development through empty table handling:
+
+1. **Initial Development**
+   ```bash
+   # Start with transformations only
+   docker compose run --rm pipeline transform
+   ```
+   - Models will return empty results but maintain correct schema
+   - Allows testing transformation logic without data
+
+2. **Full Pipeline Testing**
+   ```bash
+   # Run complete pipeline when ready
+   docker compose run --rm pipeline etl
+   ```
+   - Processes actual data through the pipeline
+   - Validates complete workflow
+
+3. **Incremental Development**
+   ```bash
+   # Run specific steps as needed
+   docker compose run --rm pipeline ingest    # Only ingest new data
+   docker compose run --rm pipeline transform # Only run transformations
+   ```
+   - Enables focused testing of specific components
+   - Maintains pipeline integrity throughout development
+
 ### 4.2 Adding New Data
 
 To add a new dataset:
@@ -201,7 +229,24 @@ To add a new dataset:
    
    - This utility simplifies working with SQLMesh and Ibis by handling table expression generation consistently. It helps prevent common integration issues and allows you to focus on your transformation logic.
 
-4. **Run the Pipeline**
+4. **Implement Error Handling**
+   - All models should implement consistent error handling using `create_empty_result`
+   - This ensures models return an empty result set with the correct schema when errors occur
+   - Example:
+   ```python
+   try:
+       # Model logic here
+       return ibis.to_sql(result)
+   except Exception as e:
+       print(f"Error processing data: {e}")
+       return create_empty_result({
+           "column1": "String",
+           "column2": "Int",
+           # ... other columns matching model schema
+       })
+   ```
+
+5. **Run the Pipeline**
    ```bash
    # Process your new data
    docker build -t osaa-mvp .
@@ -209,7 +254,7 @@ To add a new dataset:
    docker compose run --rm pipeline etl
    ```
 
-5. **Verify Results**
+6. **Verify Results**
    - Check the S3 bucket for your processed data
    - Review any error messages if the process fails
 
