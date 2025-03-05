@@ -145,6 +145,15 @@ The pipeline supports flexible development through empty table handling:
    docker compose run --rm pipeline transform
    ```
    - Models will return empty results but maintain correct schema
+   - You'll see warnings like:
+     ```
+     Found the following source tables: []
+     No source tables found, returning empty result
+     Warning: Could not process OPRI educational data: opri.data_national
+     Warning: Could not process SDG educational data: sdg.data_national
+     ```
+   - These warnings are expected when running transform without ingestion
+   - They indicate that the models are working correctly but have no data to process
    - Allows testing transformation logic without data
 
 2. **Full Pipeline Testing**
@@ -154,6 +163,7 @@ The pipeline supports flexible development through empty table handling:
    ```
    - Processes actual data through the pipeline
    - Validates complete workflow
+   - Warnings will disappear once data is ingested
 
 3. **Incremental Development**
    ```bash
@@ -163,6 +173,7 @@ The pipeline supports flexible development through empty table handling:
    ```
    - Enables focused testing of specific components
    - Maintains pipeline integrity throughout development
+   - Run ingest first to avoid empty result warnings
 
 ### 4.2 Adding New Data
 
