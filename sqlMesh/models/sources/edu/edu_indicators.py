@@ -9,26 +9,25 @@ from sqlmesh.core.macros import MacroEvaluator
 from sqlmesh import model
 import logging
 from typing import Optional
-
-COLUMN_SCHEMA = {
-    "country_id": "String",
-    "indicator_id": "String",
-    "year": "Int",
-    "value": "Decimal",
-    "indicator_description": "String",
-}
+from constants import DB_PATH
 
 @model(
     "sources.edu",
     is_sql=True,
     kind="FULL",
-    columns=COLUMN_SCHEMA
+    columns={
+        "country_id": "String",
+        "indicator_id": "String",
+        "year": "Int",
+        "value": "Decimal",
+        "indicator_description": "String",
+    }
 )
 def entrypoint(evaluator: MacroEvaluator) -> str:
     """Process educational data and return the transformed Ibis table."""
     try:
         # Connect to DuckDB
-        con = ibis.connect("duckdb:///app/sqlMesh/unosaa_data_pipeline.db")
+        con = ibis.connect(f"duckdb://{DB_PATH}")
         
         # Try to process educational data from different sources
         source_tables = []

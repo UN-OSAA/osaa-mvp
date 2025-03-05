@@ -5,23 +5,20 @@ from constants import DB_PATH
 import os
 
 
-COLUMN_SCHEMA = {
-    "model_name": "String",
-    "model_description": "String",
-    "model_kind": "String",
-    "grain": "String",
-    "columns": "String",
-    "column_descriptions": "String",
-    "physical_properties": "String",
-}
-
-
 @model(
     "_metadata.all_models",
     is_sql=True,
     kind="FULL",
     depends_on=["unosaa_data_pipeline.master.indicators", "unosaa_data_pipeline.sqlmesh._snapshots"],
-    columns=COLUMN_SCHEMA,
+    columns={
+        "model_name": "String",
+        "model_description": "String",
+        "model_kind": "String",
+        "grain": "String",
+        "columns": "String",
+        "column_descriptions": "String",
+        "physical_properties": "String",
+    },
     post_statements=["@s3_write()"],
 )
 def entrypoint(evaluator: MacroEvaluator) -> str:

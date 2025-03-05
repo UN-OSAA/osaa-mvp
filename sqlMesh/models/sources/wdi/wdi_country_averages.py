@@ -1,31 +1,28 @@
 from sqlmesh.core.macros import MacroEvaluator
 from sqlmesh import model
 import ibis
-from models.sources.wdi.wdi_indicators import COLUMN_SCHEMA as WDI_COLUMN_SCHEMA
-
-COLUMN_SCHEMA = {
-    "country_id": "String",
-    "indicator_id": "String",
-    "year": "Int",
-    "value": "Decimal",
-    "magnitude": "String",
-    "qualifier": "String",
-    "indicator_description": "String",
-    "avg_value_by_country": "Float",
-}
-
+from constants import DB_PATH
 
 @model(
     "sources.wdi_country_averages",
     is_sql=True,
     kind="FULL",
-    columns=COLUMN_SCHEMA
+    columns={
+        "country_id": "String",
+        "indicator_id": "String",
+        "year": "Int",
+        "value": "Decimal",
+        "magnitude": "String",
+        "qualifier": "String",
+        "indicator_description": "String",
+        "avg_value_by_country": "Float",
+    }
 )
 def entrypoint(evaluator: MacroEvaluator) -> str:
     """Calculate country averages for WDI indicators."""
     try:
         # Connect to DuckDB
-        con = ibis.connect("duckdb:///app/sqlMesh/unosaa_data_pipeline.db")
+        con = ibis.connect(f"duckdb://{DB_PATH}")
         
         # Try to get the WDI table directly
         wdi = con.table("sources.wdi")

@@ -6,34 +6,22 @@ from sqlmesh.core.model import model
 from macros.utils import find_indicator_models
 import typing as t
 from typing import Optional, Dict, Union, Any
-
-COLUMN_SCHEMA = {
-    "indicator_id": "String",
-    "country_id": "String",
-    "year": "Int64",
-    "value": "Decimal",
-    "magnitude": "String",
-    "qualifier": "String",
-    "indicator_description": "String",
-    "source": "String",
-}
-
-# Default schema to use if a module doesn't define one
-DEFAULT_COLUMN_SCHEMA = {
-    "country_id": "String",
-    "indicator_id": "String",
-    "year": "Int",
-    "value": "Decimal",
-    "magnitude": "String",
-    "qualifier": "String",
-}
-
+from constants import DB_PATH
 
 @model(
     "master.indicators",
     is_sql=True,
     kind="FULL",
-    columns=COLUMN_SCHEMA,
+    columns={
+        "indicator_id": "String",
+        "country_id": "String",
+        "year": "Int64",
+        "value": "Decimal",
+        "magnitude": "String",
+        "qualifier": "String",
+        "indicator_description": "String",
+        "source": "String",
+    },
     post_statements=["@s3_write()"]
 )
 def entrypoint(evaluator: MacroEvaluator) -> str:
@@ -42,7 +30,7 @@ def entrypoint(evaluator: MacroEvaluator) -> str:
     """
     try:
         # Connect to DuckDB directly
-        con = ibis.connect("duckdb:///app/sqlMesh/unosaa_data_pipeline.db")
+        con = ibis.connect(f"duckdb://{DB_PATH}")
         
         # Discover all source tables dynamically
         source_tables = []
