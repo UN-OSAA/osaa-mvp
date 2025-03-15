@@ -189,13 +189,17 @@ def validate_aws_credentials():
         required_vars = [
             "AWS_ACCESS_KEY_ID",
             "AWS_SECRET_ACCESS_KEY",
-            "AWS_DEFAULT_REGION",
+            "AWS_DEFAULT_REGION"
+        ]
+        
+        # Optional vars - used for role assumption if needed
+        optional_vars = [
             "AWS_ROLE_ARN"
         ]
         
         # Log environment variable status
         logger.debug("Checking Environment Variables:")
-        for var in required_vars:
+        for var in required_vars + optional_vars:
             value = os.getenv(var)
             logger.debug(f"  {var}: {_mask_sensitive(value)}")
 
@@ -209,14 +213,14 @@ def validate_aws_credentials():
         access_key = os.getenv("AWS_ACCESS_KEY_ID")
         secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
         region = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
-        role_arn = os.getenv("AWS_ROLE_ARN")
+        role_arn = os.getenv("AWS_ROLE_ARN")  # May be None if not provided
         session_token = os.getenv("AWS_SESSION_TOKEN")  # May be None if not provided
         
         # Add detailed debug logging
         logger.info(f"AWS Region: {region}")
         logger.info(f"Access Key ID: {access_key[:4]}{'*' * (len(access_key) - 8)}{access_key[-4:] if len(access_key) > 8 else ''}")
         logger.info(f"Secret Access Key: {'*' * min(8, len(secret_key))}{secret_key[-4:] if len(secret_key) > 4 else ''}")
-        logger.info(f"Role ARN: {role_arn}")
+        logger.info(f"Role ARN: {role_arn if role_arn else 'Not provided - using direct credentials'}")
         logger.info(f"Session Token provided: {bool(session_token)}")
         if session_token:
             logger.info(f"Session Token Length: {len(session_token)}")
@@ -269,7 +273,24 @@ def validate_aws_credentials():
             # Create STS client
             sts_client = boto3.client("sts", **sts_kwargs)
             
-            # Assume role to verify credentials
+            # Use direct credentials if no role ARN is provided
+            if not role_arn:
+                logger.info("No AWS_ROLE_ARN provided, using direct credentials")
+                # Create S3 client with direct credentials
+                s3_client = boto3.client(
+                    "s3",
+                    aws_access_key_id=access_key,
+                    aws_secret_access_key=secret_key,
+                    aws_session_token=session_token,
+                    region_name=region
+                )
+                
+                # Test bucket listing
+                s3_client.list_buckets()
+                logger.info("AWS credentials validated successfully with direct access")
+                return
+            
+            # Otherwise proceed with role assumption
             try:
                 assumed_role = sts_client.assume_role(
                     RoleArn=role_arn,

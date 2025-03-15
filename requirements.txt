@@ -7,6 +7,8 @@ git+https://github.com/ibis-project/ibis.git@bd30ba5#egg=ibis-framework[duckdb]
 sqlfluff==3.0.0
 sqlglot==26.2.1
 sqlmesh[web]==0.146.0
+IPython==7.34.0  # Note: SQLMesh requires IPython's display module, but there are compatibility issues
+jupyter==1.0.0  # Added to attempt to provide IPython.display module, but as fallback use SKIP_SQLMESH=true
 numpy==1.26.4  # Pinning to numpy 1.x for compatibility
 pandas<3.0.0  # Ensuring pandas is compatible with numpy 1.x
 python-dotenv>=1.0.1

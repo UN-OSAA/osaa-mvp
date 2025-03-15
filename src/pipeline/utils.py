@@ -146,18 +146,16 @@ def s3_init(return_session: bool = False) -> Tuple[Any, Optional[Any]]:
         
         # Get role ARN from environment
         role_arn = os.environ.get("AWS_ROLE_ARN")
-        if not role_arn:
-            raise ValueError("AWS_ROLE_ARN is not set in environment variables")
-
         region = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
         session_token = os.environ.get("AWS_SESSION_TOKEN")  # May be None if not provided
+        access_key = os.environ.get("AWS_ACCESS_KEY_ID", "")
+        secret_key = os.environ.get("AWS_SECRET_ACCESS_KEY", "")
         
         # Add debug logging
         logger.info(f"AWS Region: {region}")
-        access_key = os.environ.get("AWS_ACCESS_KEY_ID", "")
-        secret_key = os.environ.get("AWS_SECRET_ACCESS_KEY", "")
         logger.info(f"Access Key ID: {access_key[:4]}{'*' * (len(access_key) - 8)}{access_key[-4:] if len(access_key) > 8 else ''}")
         logger.info(f"Secret Access Key: {'*' * 8}{secret_key[-4:] if len(secret_key) > 4 else ''}")
+        logger.info(f"Role ARN: {role_arn if role_arn else 'Not provided - using direct credentials'}")
         logger.info(f"Session Token provided: {bool(session_token)}")
         if session_token:
             logger.info(f"Session Token Length: {len(session_token)}")
@@ -169,6 +167,28 @@ def s3_init(return_session: bool = False) -> Tuple[Any, Optional[Any]]:
             if not session_token:
                 logger.warning("⚠️ CRITICAL: Temporary credentials detected but no session token provided!")
 
+        # If no role ARN is provided, use direct credentials
+        if not role_arn:
+            logger.info("No AWS_ROLE_ARN provided, using direct credentials for S3")
+            
+            # Create session with direct credentials
+            session = boto3.Session(
+                aws_access_key_id=access_key,
+                aws_secret_access_key=secret_key,
+                aws_session_token=session_token,
+                region_name=region
+            )
+            
+            # Create S3 client from session
+            s3_client = session.client('s3')
+            logger.info("Successfully created S3 client with direct credentials")
+            
+            if return_session:
+                return s3_client, session
+            else:
+                return s3_client
+                
+        # Otherwise proceed with role assumption
         # Create STS client with session token if available
         sts_kwargs = {
             "region_name": region
@@ -193,14 +213,14 @@ def s3_init(return_session: bool = False) -> Tuple[Any, Optional[Any]]:
         
         # Add session token if it exists (for temporary credentials)
         if session_token:
-            sts_kwargs["aws_access_key_id"] = os.environ.get("AWS_ACCESS_KEY_ID")
-            sts_kwargs["aws_secret_access_key"] = os.environ.get("AWS_SECRET_ACCESS_KEY")
+            sts_kwargs["aws_access_key_id"] = access_key
+            sts_kwargs["aws_secret_access_key"] = secret_key
             sts_kwargs["aws_session_token"] = session_token
             logger.info("Using session token for AWS authentication")
         else:
             # If no session token, still add access and secret keys
-            sts_kwargs["aws_access_key_id"] = os.environ.get("AWS_ACCESS_KEY_ID")
-            sts_kwargs["aws_secret_access_key"] = os.environ.get("AWS_SECRET_ACCESS_KEY")
+            sts_kwargs["aws_access_key_id"] = access_key
+            sts_kwargs["aws_secret_access_key"] = secret_key
             logger.info("Using standard AWS credentials without session token")
 
         # Create STS client
