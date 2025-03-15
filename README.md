@@ -55,26 +55,39 @@ This project uses AWS authentication to access S3 resources through a cross-acco
 
 ### 3.1 Setting Up Your Credentials
 
-1. **Obtain your access keys** from the AWS Access Portal
-   - Log into the AWS Access Portal
-   - Navigate to your assigned account
-   - Create or view your access keys
+For security reasons, AWS credentials are not included in this repository. Follow these steps to set up your credentials:
+
+1. **Get credentials** from your team lead
 
 2. **Update your `.env` file** with the credentials
-   ```
+
+   ```properties
    # AWS credentials
-   AWS_ACCESS_KEY_ID=your_access_key_from_portal
-   AWS_SECRET_ACCESS_KEY=your_secret_key_from_portal
-   AWS_DEFAULT_REGION=eu-west-1
-   AWS_ROLE_ARN=arn:aws:iam::135808948752:role/UNOSAA-Data-Pipeline-Role
-   S3_BUCKET_NAME=unosaa-data-pipeline
+   AWS_ACCESS_KEY_ID=your_access_key
+   AWS_SECRET_ACCESS_KEY=your_secret_key
+   AWS_DEFAULT_REGION=us-east-1
+   
+   # For temporary credentials (starting with "ASIA"), include the session token
+   AWS_SESSION_TOKEN=your_session_token
+   
+   # Role assumption (if needed)
+   AWS_ROLE_ARN=arn:aws:iam::your_account_id:role/your_role_name
    ```
 
-3. **How it works**
-   - Your AWS access keys authenticate you to AWS
-   - The pipeline code assumes the specified IAM role (AWS_ROLE_ARN)
-   - All S3 operations are performed with the role's permissions
-   - This provides enhanced security and audit trails
+   > **Note**: If using temporary credentials (AWS_ACCESS_KEY_ID starts with ASIA):
+   > 1. Always include the AWS_SESSION_TOKEN
+   > 2. Be aware that these credentials expire, typically in 1-12 hours
+   > 3. You'll need to update them when expired
+
+3. **Credential Security**
+   - **Never** commit your `.env` file to the repository
+   - **Never** share your credentials in public forums
+   - **Don't** use `.env.test` files with real credentials for testing
+   - Temporary credentials (starting with ASIA) are preferred for security
+
+4. **Important Dependencies**
+   - This project requires IPython==7.34.0 and jupyter==1.0.0 for SQLMesh to work properly
+   - If you encounter SQLMesh errors, verify these dependencies are in requirements.txt
 
 ### 3.2 Role-based Authentication Benefits
 
@@ -148,7 +161,16 @@ After installing Docker Desktop, you'll need to start the application before run
    - Ensure requirements.txt contains boto3>=1.35.0
    - Run `docker build --no-cache -t osaa-mvp .` to force a clean rebuild
 
-4. **Data Not Found**
+4. **SQLMesh IPython Display Error**
+   - If you encounter an error like `ImportError: cannot import name 'display' from 'IPython.core.display'`:
+     - Check that IPython==7.34.0 and jupyter==1.0.0 are in your requirements.txt file
+     - Rebuild the Docker image with `docker build --no-cache -t osaa-mvp .`
+   - Alternatively, you can use the SKIP_SQLMESH flag for testing S3 connectivity:
+   ```bash
+   docker run --rm -e SKIP_SQLMESH=true -e SKIP_AWS_VALIDATION=false --env-file .env osaa-mvp transform_dry_run
+   ```
+
+5. **Data Not Found**
    - Check that your source data is in the correct location
    - Verify file names and formats
 
