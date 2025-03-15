@@ -49,7 +49,40 @@ Here's how to get started with the OSAA Data Pipeline:
    - Your development data: `s3://unosaa-data-pipeline/dev/dev_{USERNAME}/...`
    - Production data: `s3://unosaa-data-pipeline/prod/...`
 
-For detailed instructions and advanced usage, see the sections below.
+## 3. AWS Authentication
+
+This project uses AWS authentication to access S3 resources through a cross-account role assumption model:
+
+### 3.1 Setting Up Your Credentials
+
+1. **Obtain your access keys** from the AWS Access Portal
+   - Log into the AWS Access Portal
+   - Navigate to your assigned account
+   - Create or view your access keys
+
+2. **Update your `.env` file** with the credentials
+   ```
+   # AWS credentials
+   AWS_ACCESS_KEY_ID=your_access_key_from_portal
+   AWS_SECRET_ACCESS_KEY=your_secret_key_from_portal
+   AWS_DEFAULT_REGION=eu-west-1
+   AWS_ROLE_ARN=arn:aws:iam::135808948752:role/UNOSAA-Data-Pipeline-Role
+   S3_BUCKET_NAME=unosaa-data-pipeline
+   ```
+
+3. **How it works**
+   - Your AWS access keys authenticate you to AWS
+   - The pipeline code assumes the specified IAM role (AWS_ROLE_ARN)
+   - All S3 operations are performed with the role's permissions
+   - This provides enhanced security and audit trails
+
+### 3.2 Role-based Authentication Benefits
+
+The role assumption approach provides several advantages:
+- **Enhanced Security**: Limited permissions for your access keys
+- **Audit Trail**: Operations are logged with both your identity and the assumed role
+- **Temporary Credentials**: Role credentials expire automatically
+- **Least Privilege**: The role has only the specific permissions needed
 
 ## 3. Getting Started
 
@@ -105,7 +138,17 @@ After installing Docker Desktop, you'll need to start the application before run
    - Verify your credentials in `.env`
    - Contact your team lead for valid credentials
 
-2. **Data Not Found**
+2. **AWS Credential Issues**
+   - For temporary credentials (starting with ASIA), ensure AWS_SESSION_TOKEN is also set
+   - Use `eu-west-1` as the AWS_DEFAULT_REGION for best results
+   - Ensure your IAM role has S3 permissions for both bucket listing and object operations
+
+3. **"boto3 not found" or AWS SDK Errors**
+   - If you encounter boto3-related errors, rebuild the Docker container
+   - Ensure requirements.txt contains boto3>=1.35.0
+   - Run `docker build --no-cache -t osaa-mvp .` to force a clean rebuild
+
+4. **Data Not Found**
    - Check that your source data is in the correct location
    - Verify file names and formats
 
