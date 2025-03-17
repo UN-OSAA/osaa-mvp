@@ -166,178 +166,75 @@ def validate_config():
 
 def validate_aws_credentials():
     """
-    Validate AWS credentials by attempting to create an S3 client
+    Validate AWS credentials by attempting to create a session
     and make a test call to AWS.
     """
-    # Skip validation if in testing mode
-    if os.getenv("SKIP_AWS_VALIDATION", "false").lower() == "true":
-        logger.warning("⚠️ AWS CREDENTIAL VALIDATION BYPASSED (TESTING MODE) ⚠️")
-        logger.warning("This should only be used for local testing")
-        return
-
     def _mask_sensitive(value):
         """Mask sensitive information in logs."""
         if not value:
-            return "NOT SET"
-        return "*" * (len(value) - 4) + value[-4:] if len(value) > 4 else "*" * len(value)
+            return None
+        if len(value) <= 8:
+            return "***"
+        return f"{value[:4]}...{value[-4:]}"
 
     try:
-        # Credential validation stages
-        logger.info("Validating AWS Credentials")
+        session = boto3.Session()
+        credentials = session.get_credentials()
+        if not credentials:
+            raise ConfigurationError("No AWS credentials found")
 
-        # Check required environment variables
-        required_vars = [
-            "AWS_ACCESS_KEY_ID",
-            "AWS_SECRET_ACCESS_KEY",
-            "AWS_DEFAULT_REGION"
-        ]
+        # Get frozen credentials to check expiration
+        frozen_creds = credentials.get_frozen_credentials()
         
-        # Optional vars - used for role assumption if needed
-        optional_vars = [
-            "AWS_ROLE_ARN"
-        ]
+        # Check if using temporary credentials (ASIA prefix)
+        if hasattr(frozen_creds, 'access_key') and frozen_creds.access_key.startswith('ASIA'):
+            if not hasattr(frozen_creds, 'token'):
+                raise ConfigurationError(
+                    "Temporary credentials detected (ASIA) but no session token found. "
+                    "Please ensure you have set AWS_SESSION_TOKEN in your environment."
+                )
         
-        # Log environment variable status
-        logger.debug("Checking Environment Variables:")
-        for var in required_vars + optional_vars:
-            value = os.getenv(var)
-            logger.debug(f"  {var}: {_mask_sensitive(value)}")
-
-        # Validate variable presence
-        missing_vars = [var for var in required_vars if not os.getenv(var)]
-        if missing_vars:
-            missing_list = ", ".join(missing_vars)
-            raise ConfigurationError(f"Missing AWS credentials: {missing_list}")
-
-        # Extract credentials
-        access_key = os.getenv("AWS_ACCESS_KEY_ID")
-        secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
-        region = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
-        role_arn = os.getenv("AWS_ROLE_ARN")  # May be None if not provided
-        session_token = os.getenv("AWS_SESSION_TOKEN")  # May be None if not provided
-        
-        # Add detailed debug logging
-        logger.info(f"AWS Region: {region}")
-        logger.info(f"Access Key ID: {access_key[:4]}{'*' * (len(access_key) - 8)}{access_key[-4:] if len(access_key) > 8 else ''}")
-        logger.info(f"Secret Access Key: {'*' * min(8, len(secret_key))}{secret_key[-4:] if len(secret_key) > 4 else ''}")
-        logger.info(f"Role ARN: {role_arn if role_arn else 'Not provided - using direct credentials'}")
-        logger.info(f"Session Token provided: {bool(session_token)}")
-        if session_token:
-            logger.info(f"Session Token Length: {len(session_token)}")
-            
-        if access_key.startswith("ASIA"):
-            logger.info("Detected temporary credentials (ASIA prefix)")
-            if not session_token:
-                logger.warning("⚠️ CRITICAL: Temporary credentials detected but no session token provided!")
-                logger.warning("Temporary credentials (ASIA prefix) require a session token")
-
-        # Validate credential format
-        if not access_key.startswith("AKIA") and not access_key.startswith("ASIA"):
-            logger.warning("Potential non-standard AWS Access Key ID format")
-
-        if len(access_key) < 10 or len(secret_key) < 20:
-            raise ConfigurationError("Incomplete or malformed AWS credentials")
-
-        # S3 client creation and validation
+        # Test the credentials with a simple S3 operation
         try:
-            # Create STS client
-            logger.info("Creating STS client with explicit configuration")
-            sts_kwargs = {
-                "aws_access_key_id": access_key,
-                "aws_secret_access_key": secret_key,
-                "region_name": region
-            }
+            s3 = session.client('s3')
+            s3.list_buckets()
+        except ClientError as e:
+            error_code = e.response.get('Error', {}).get('Code', '')
+            error_message = e.response.get('Error', {}).get('Message', str(e))
             
-            # Fix region endpoint format if needed
-            if not region:
-                logger.warning("AWS_DEFAULT_REGION not set, defaulting to eu-west-1")
-                region = "eu-west-1"
-                sts_kwargs["region_name"] = region
-            
-            # Make sure region doesn't have incorrect format
-            if '..' in region:
-                logger.warning(f"Malformed region detected: {region}, fixing to eu-west-1")
-                region = "eu-west-1"
-                sts_kwargs["region_name"] = region
-                
-            # Add explicit endpoint URL to avoid potential DNS issues
-            endpoint_url = f"https://sts.{region}.amazonaws.com"
-            sts_kwargs["endpoint_url"] = endpoint_url
-            logger.info(f"Using explicit endpoint URL: {endpoint_url}")
-            
-            # Add session token if it exists
-            if session_token:
-                sts_kwargs["aws_session_token"] = session_token
-                logger.info("Using session token for AWS authentication")
-            
-            # Create STS client
-            sts_client = boto3.client("sts", **sts_kwargs)
-            
-            # Use direct credentials if no role ARN is provided
-            if not role_arn:
-                logger.info("No AWS_ROLE_ARN provided, using direct credentials")
-                # Create S3 client with direct credentials
-                s3_client = boto3.client(
-                    "s3",
-                    aws_access_key_id=access_key,
-                    aws_secret_access_key=secret_key,
-                    aws_session_token=session_token,
-                    region_name=region
+            if error_code == 'ExpiredToken':
+                raise ConfigurationError(
+                    "\n🔑 AWS Token Expired! 🔑\n"
+                    "Your temporary AWS credentials have expired. To refresh them:\n"
+                    "1. Run 'aws sso login' if using SSO\n"
+                    "2. Or get new temporary credentials from your AWS Console\n"
+                    "3. Update your environment variables with the new credentials\n"
+                    "\nNote: Temporary credentials typically expire after 1 hour.\n"
+                    f"Error details: {error_message}"
                 )
-                
-                # Test bucket listing
-                s3_client.list_buckets()
-                logger.info("AWS credentials validated successfully with direct access")
-                return
+            elif error_code == 'InvalidAccessKeyId':
+                raise ConfigurationError(
+                    "\n❌ Invalid AWS Access Key ❌\n"
+                    "Your AWS access key is not valid. Please check:\n"
+                    "1. AWS_ACCESS_KEY_ID is set correctly\n"
+                    "2. You are using the correct credentials for this environment\n"
+                    f"\nError details: {error_message}"
+                )
+            elif error_code == 'SignatureDoesNotMatch':
+                raise ConfigurationError(
+                    "\n❌ Invalid AWS Secret Key ❌\n"
+                    "Your AWS secret key is not valid. Please check:\n"
+                    "1. AWS_SECRET_ACCESS_KEY is set correctly\n"
+                    "2. The secret key matches your access key\n"
+                    f"\nError details: {error_message}"
+                )
+            else:
+                raise ConfigurationError(f"AWS Authentication Error: {error_message}")
             
-            # Otherwise proceed with role assumption
-            try:
-                assumed_role = sts_client.assume_role(
-                    RoleArn=role_arn,
-                    RoleSessionName="ValidationSession"
-                )
-                
-                # Create S3 client with assumed role
-                s3_client = boto3.client(
-                    "s3",
-                    aws_access_key_id=assumed_role["Credentials"]["AccessKeyId"],
-                    aws_secret_access_key=assumed_role["Credentials"]["SecretAccessKey"],
-                    aws_session_token=assumed_role["Credentials"]["SessionToken"],
-                    region_name=region
-                )
-                
-                # Test bucket listing
-                s3_client.list_buckets()
-                logger.info("AWS credentials validated successfully")
-                
-            except ClientError as assume_error:
-                error_code = assume_error.response["Error"]["Code"]
-                error_message = assume_error.response["Error"]["Message"]
-                logger.error(f"Role Assumption Error: {error_code}")
-                logger.error(f"Error Details: {error_message}")
-                raise ConfigurationError(f"Failed to assume role: {error_message}")
-        except Exception as client_error:
-            logger.error(f"AWS Client Creation Failed: {client_error}")
-            raise ConfigurationError(f"AWS Authentication Error: {client_error}")
-
     except Exception as e:
-        # Structured error reporting
-        logger.critical("🔒 AWS CREDENTIALS VALIDATION FAILED 🔒")
-        logger.critical(f"Error Type: {type(e).__name__}")
-        logger.critical(f"Error Details: {str(e)}")
-
-        # Concise troubleshooting guide
-        troubleshooting_steps = [
-            "1. Verify AWS credentials in .env",
-            "2. Check IAM user permissions to assume the role",
-            "3. Ensure the role has proper S3 permissions",
-            "4. Verify network connectivity to AWS"
-        ]
-
-        for step in troubleshooting_steps:
-            logger.critical(step)
-
-        raise ConfigurationError(f"AWS Credential Validation Failed: {e}")
+        if isinstance(e, ConfigurationError):
+            raise
+        raise ConfigurationError(f"AWS credentials validation failed: {str(e)}")
 
 
 # Validate configuration and AWS credentials when module is imported

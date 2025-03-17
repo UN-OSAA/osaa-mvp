@@ -1,36 +1,7 @@
 #!/bin/bash
 set -e  # Exit on error
 
-# Debug AWS environment variables (masking sensitive values)
-echo "=== AWS ENVIRONMENT VARIABLES ==="
-if [ -n "$AWS_ACCESS_KEY_ID" ]; then
-  echo "AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:0:4}...${AWS_ACCESS_KEY_ID: -4} (length: ${#AWS_ACCESS_KEY_ID})"
-else
-  echo "AWS_ACCESS_KEY_ID: NOT SET"
-fi
-
-if [ -n "$AWS_SECRET_ACCESS_KEY" ]; then
-  echo "AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:0:1}...${AWS_SECRET_ACCESS_KEY: -4} (length: ${#AWS_SECRET_ACCESS_KEY})"
-else
-  echo "AWS_SECRET_ACCESS_KEY: NOT SET"
-fi
-
-if [ -n "$AWS_SESSION_TOKEN" ]; then
-  echo "AWS_SESSION_TOKEN is SET (length: ${#AWS_SESSION_TOKEN})"
-else
-  echo "AWS_SESSION_TOKEN: NOT SET"
-fi
-
-echo "AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION"
-echo "AWS_ROLE_ARN: $AWS_ROLE_ARN"
-echo "=== END ENVIRONMENT DEBUG ==="
-
 case "$1" in
-  "debug-aws")
-    echo "Debugging AWS environment variables..."
-    env | grep -E 'AWS_|S3_'
-    echo "Debug complete"
-    ;;
   "ingest")
     uv run python -m pipeline.ingest.run
     ;;

@@ -74,10 +74,14 @@ For security reasons, AWS credentials are not included in this repository. Follo
    AWS_ROLE_ARN=arn:aws:iam::your_account_id:role/your_role_name
    ```
 
-   > **Note**: If using temporary credentials (AWS_ACCESS_KEY_ID starts with ASIA):
-   > 1. Always include the AWS_SESSION_TOKEN
-   > 2. Be aware that these credentials expire, typically in 1-12 hours
-   > 3. You'll need to update them when expired
+   > **Important Notes About Temporary Credentials**:
+   > - Temporary credentials (AWS_ACCESS_KEY_ID starting with ASIA) expire after 1 hour
+   > - When credentials expire, you'll see a clear error message with instructions
+   > - To refresh expired credentials:
+   >   1. Run `aws sso login` if using AWS SSO
+   >   2. Or get new temporary credentials from AWS Console
+   >   3. Update your `.env` file with the new credentials
+   > - The system will automatically detect expired tokens and guide you through renewal
 
 3. **Credential Security**
    - **Never** commit your `.env` file to the repository
@@ -152,7 +156,7 @@ After installing Docker Desktop, you'll need to start the application before run
    - Contact your team lead for valid credentials
 
 2. **AWS Credential Issues**
-   - For temporary credentials (starting with ASIA), ensure AWS_SESSION_TOKEN is also set
+   - For temporary credentials (starting with ASIA), ensure AWS_SESSION_TOKEN is set
    - Use `eu-west-1` as the AWS_DEFAULT_REGION for best results
    - Ensure your IAM role has S3 permissions for both bucket listing and object operations
 
