@@ -157,8 +157,9 @@ After installing Docker Desktop, you'll need to start the application before run
 
 2. **AWS Credential Issues**
    - For temporary credentials (starting with ASIA), ensure AWS_SESSION_TOKEN is set
-   - Use `eu-west-1` as the AWS_DEFAULT_REGION for best results
+   - Set AWS_DEFAULT_REGION to match your organization's AWS region
    - Ensure your IAM role has S3 permissions for both bucket listing and object operations
+   - The system will provide specific error messages for common authentication problems
 
 3. **"boto3 not found" or AWS SDK Errors**
    - If you encounter boto3-related errors, rebuild the Docker container
