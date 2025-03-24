@@ -2,10 +2,12 @@ import functools
 import os
 import re
 import time
+import io
 from typing import Any, Callable, Dict, Optional, Tuple
 
 import boto3
 from botocore.exceptions import ClientError
+import logging
 
 from pipeline.logging_config import create_logger, log_exception
 
@@ -67,61 +69,41 @@ def log_aws_initialization_error(error):
 
 def s3_init(return_session: bool = False) -> Tuple[Any, Optional[Any]]:
     """
-    Initialize S3 client using STS to assume a role.
-
-    :param return_session: If True, returns both client and session
-    :return: S3 client, and optionally the session
-    :raises ClientError: If S3 initialization fails
+    Initialize S3 client and optionally return the session.
+    Returns a tuple of (s3_client, session) where session is None if return_session is False.
     """
     logger = create_logger(__name__)
-
     try:
-        # Get role ARN from environment
-        role_arn = os.environ.get("AWS_ROLE_ARN")
-        if not role_arn:
-            raise ValueError("AWS_ROLE_ARN is not set in environment variables")
-
-        region = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
-
-        # Create STS client
-        sts_client = boto3.client("sts")
-
-        # Assume role
-        assumed_role_object = sts_client.assume_role(
-            RoleArn=role_arn, RoleSessionName="OsaaMvpSession"
-        )
-
-        # Get temporary credentials
-        credentials = assumed_role_object["Credentials"]
-
-        # Create session with temporary credentials
-        session = boto3.Session(
-            aws_access_key_id=credentials["AccessKeyId"],
-            aws_secret_access_key=credentials["SecretAccessKey"],
-            aws_session_token=credentials["SessionToken"],
-            region_name=region,
-        )
-
-        # Create S3 client
-        s3_client = session.client("s3")
-
-        # Verify S3 access
+        session = boto3.Session()
+        s3_client = session.client('s3')
+        
+        # Test connection with a simple operation
         try:
             s3_client.list_buckets()
-            logger.info("S3 client initialized successfully with assumed role.")
-        except ClientError as access_error:
-            error_code = access_error.response["Error"]["Code"]
-            error_message = access_error.response["Error"]["Message"]
-            logger.error(f"S3 Access Error: {error_code}")
-            logger.error(f"Detailed Error Message: {error_message}")
-            raise
-
-        return (s3_client, session) if return_session else s3_client
-
+        except ClientError as e:
+            error_code = e.response.get('Error', {}).get('Code', '')
+            error_message = e.response.get('Error', {}).get('Message', str(e))
+            
+            if error_code == 'ExpiredToken':
+                logger.error(
+                    "\n🔑 AWS Token Expired! 🔑\n"
+                    "Your temporary AWS credentials have expired. To refresh them:\n"
+                    "1. Run 'aws sso login' if using SSO\n"
+                    "2. Or get new temporary credentials from your AWS Console\n"
+                    "3. Update your environment variables with the new credentials\n"
+                    "\nNote: Temporary credentials typically expire after 1 hour."
+                )
+                raise ConfigurationError(f"Token expired: {error_message}")
+            else:
+                raise ConfigurationError(f"S3 client initialization failed: {error_message}")
+                
+        return (s3_client, session if return_session else None)
+        
     except Exception as e:
-        logger.critical(f"Failed to initialize S3 client: {e}")
-        log_aws_initialization_error(e)
-        raise
+        if isinstance(e, ConfigurationError):
+            raise
+        logger.error(f"Failed to initialize S3 client: {str(e)}")
+        raise ConfigurationError(f"S3 client initialization failed: {str(e)}")
 
 
 # File path and naming utilities

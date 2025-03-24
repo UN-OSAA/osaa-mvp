@@ -7,6 +7,7 @@ ipython==8.12.0  # Pinned to avoid compatibility issues with SQLMesh
 sqlfluff==3.0.0
 sqlglot==26.2.1
 sqlmesh[web]==0.146.0
+jupyter==1.0.0  # Added to ensure IPython.display module is available
 numpy==1.26.4  # Pinning to numpy 1.x for compatibility
 pandas<3.0.0  # Ensuring pandas is compatible with numpy 1.x
 python-dotenv>=1.0.1

@@ -15,6 +15,7 @@ from botocore.exceptions import ClientError
 from pipeline.exceptions import S3OperationError
 from pipeline.logging_config import create_logger
 from pipeline.config import S3_BUCKET_NAME
+from pipeline.utils import s3_init
 
 logger = create_logger(__name__)
 
@@ -32,7 +33,12 @@ def sync_db_with_s3(operation: str, db_path: str, bucket_name: str, s3_key: str)
         S3OperationError: If S3 operations fail
     """
     try:
-        s3_client = boto3.client('s3')
+        # Use s3_init to properly handle session token and role assumption
+        s3_client = s3_init()
+        
+        # Extract the client from the tuple returned by s3_init
+        if isinstance(s3_client, tuple):
+            s3_client = s3_client[0]
         
         if operation == "download":
             logger.info("Attempting to download DB from S3...")
