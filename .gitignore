@@ -1,27 +1,33 @@
-# OS generated files #
-.DS_Store
-.DS_Store?
-._*
-.vscode
-
-# Files
-sql_agent.ipynb
-explore.ipynb
-dev-requirements.txt
-.env
-.db
-
-# folders
-datalake/
-scratchpad/
 dashboards/
 __MACOSX
 
+# SQLMesh
 sqlMesh/.cache/*
 sqlMesh/logs
 sqlMesh/*.db
 sqlMesh/*.db.wal
 
+# Python artifacts
 *.pyc
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+.pytest_cache/
+.coverage
+htmlcov/
 
-.venv
+# Virtual environment
+.venv/
+venv/
+ENV/
+
+# Caches
+.ruff_cache/
+.mypy_cache/
+.ipynb_checkpoints
+
+# Build artifacts
+*.egg-info/
+dist/
+build/

@@ -161,7 +161,8 @@ def find_indicator_models(
 
     Args:
         selected_models: Optional list of model names to include (e.g., ['opri']).
-                         If None, all models are included.
+                         If None, all models ending with _indicators.py are included.
+                         If source names are provided, only models ending with _indicators.py in the selected sources will be included.
                          If a model name is not found, it will be skipped.
     """
     indicator_models = []

@@ -39,6 +39,12 @@ Here's how to get started with the OSAA Data Pipeline:
    # Run only transformations
    docker compose run --rm pipeline transform
 
+   # Run a configuration test
+   docker compose run --rm pipeline config_test
+
+   # Promote data (from dev/landing to prod/landing)
+   docker compose run --rm pipeline promote
+
    # Run in development mode with your username
    docker compose run --rm -e USERNAME=your_name pipeline etl
    ```
@@ -241,6 +247,35 @@ To add a new dataset:
 
 3. **Add a transformation model**
    - Create a transformation model (if needed) in SQLMesh using Ibis. Add the model to the same folder as the source model above.
+
+   - For Python-based transformation models, we recommend using the `generate_ibis_table` utility to reference other models/dependencies in the model you're developing:
+   ```python
+   # Import the table generation utility
+   from macros.ibis_expressions import generate_ibis_table
+
+   # Example transformation model
+   @model(...)
+   def entrypoint(evaluator: MacroEvaluator) -> str:
+       # Generate the Ibis table expression
+       model_1 = generate_ibis_table(
+           evaluator,
+           table_name="your_table",
+           column_schema=get_sql_model_schema(...),
+           schema_name="your_schema"
+       )
+
+       model_2 = generate_ibis_table(
+           evaluator,
+           table_name="your_table",
+           column_schema=get_sql_model_schema(...),
+           schema_name="your_schema"
+
+       your_model = model_1.join(model_2, "your_join_key")
+
+       return ibis.to_sql(your_model)
+   ```
+   - The sdg_indicators.py model is a good example of how to use the `generate_ibis_table` utility.
+   - This utility simplifies working with SQLMesh and Ibis by handling table expression generation consistently. It helps prevent common integration issues and allows you to focus on your transformation logic.
 
 4. **Run the Pipeline**
    ```bash
