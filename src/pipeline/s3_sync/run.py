@@ -36,6 +36,10 @@ def sync_db_with_s3(operation: str, db_path: str, bucket_name: str, s3_key: str)
         # Use s3_init to properly handle session token and role assumption
         s3_client = s3_init()
         
+        # Extract the client from the tuple returned by s3_init
+        if isinstance(s3_client, tuple):
+            s3_client = s3_client[0]
+        
         if operation == "download":
             logger.info("Attempting to download DB from S3...")
             try:
