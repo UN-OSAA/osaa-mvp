@@ -1,5 +1,6 @@
 dashboards/
 __MACOSX
+.env
 
 # SQLMesh
 sqlMesh/.cache/*
