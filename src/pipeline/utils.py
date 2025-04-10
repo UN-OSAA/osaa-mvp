@@ -9,7 +9,8 @@ import boto3
 from botocore.exceptions import ClientError
 import logging
 
-from pipeline.logging_config import create_logger, log_exception
+from pipeline.logging_config import create_logger
+from pipeline.config import ConfigurationError
 
 
 def retry(

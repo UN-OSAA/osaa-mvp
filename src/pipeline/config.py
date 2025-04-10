@@ -160,8 +160,6 @@ def validate_config():
     if not TARGET:
         raise ConfigurationError("TARGET environment is not set")
 
-    # Log validation success (optional)
-    logger.info("Configuration validation successful")
 
 
 def validate_aws_credentials():
@@ -239,8 +237,15 @@ def validate_aws_credentials():
 
 # Validate configuration and AWS credentials when module is imported
 try:
+    # First validate basic configuration
     validate_config()
+    
+    # Then validate AWS credentials if not skipped
     if os.getenv("SKIP_AWS_VALIDATION", "false").lower() != "true":
         validate_aws_credentials()
+    
+    # Only log success after all validations pass
+    logger.info("Configuration validation successful")
 except ConfigurationError as config_error:
+    logger.error(f"Configuration validation failed: {config_error}")
     sys.exit(1)
