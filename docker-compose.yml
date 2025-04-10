@@ -6,15 +6,16 @@ x-common-config: &common-config
   volumes:
     - ./datalake:/app/datalake
     - ./sqlMesh:/app/sqlMesh
+    - ./.env:/app/.env:ro
   environment:
-    - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-    - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-    - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
-    - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
-    - AWS_ROLE_ARN=${AWS_ROLE_ARN}
-    - S3_BUCKET_NAME=${S3_BUCKET_NAME}
-    - TARGET=${TARGET}
-    - USERNAME=${USERNAME}
+    - AWS_ACCESS_KEY_ID
+    - AWS_SECRET_ACCESS_KEY
+    - AWS_SESSION_TOKEN
+    - AWS_DEFAULT_REGION
+    - AWS_ROLE_ARN
+    - S3_BUCKET_NAME
+    - TARGET
+    - USERNAME
     - DB_PATH=/app/sqlMesh/unosaa_data_pipeline.db
 
 services:

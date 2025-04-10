@@ -1,6 +1,20 @@
 #!/bin/bash
 set -e  # Exit on error
 
+# Function to load environment variables from .env file
+load_env_file() {
+  if [ -f "$1" ]; then
+    echo "Loading environment variables from $1..."
+    set -a
+    source "$1"
+    set +a
+  fi
+}
+
+# Try to load from .env in current directory and /app/.env
+load_env_file ".env"
+
+
 case "$1" in
   "ingest")
     uv run python -m pipeline.ingest.run
