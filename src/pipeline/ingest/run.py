@@ -150,18 +150,30 @@ class Ingest:
                 logger.error(f"Failed to get row count for table {fully_qualified_name}: {e}")
                 raise FileConversionError(f"Failed to verify table creation: {e}")
 
-            # Attempt S3 upload
-            logger.info(f"Attempting to upload to S3: {s3_file_path}")
-            copy_sql = f"""
-                COPY (SELECT * FROM {fully_qualified_name})
-                TO '{s3_file_path}'
-                (FORMAT PARQUET)
-            """
-            self.con.sql(copy_sql)
-
-            logger.info(
-                f"Successfully converted and uploaded {local_file_path} to {s3_file_path}"
-            )
+            # Attempt S3 upload only if enabled
+            if ENABLE_S3_UPLOAD and s3_file_path:
+                logger.info(f"Attempting to upload to S3: {s3_file_path}")
+                copy_sql = f"""
+                    COPY (SELECT * FROM {fully_qualified_name})
+                    TO '{s3_file_path}'
+                    (FORMAT PARQUET)
+                """
+                self.con.sql(copy_sql)
+                logger.info(
+                    f"Successfully converted and uploaded {local_file_path} to {s3_file_path}"
+                )
+            else:
+                logger.info(f"S3 upload disabled. Skipping upload for: {local_file_path}")
+                # Create local parquet file instead
+                local_parquet_path = os.path.splitext(local_file_path)[0] + ".parquet"
+                logger.info(f"Saving parquet file locally to: {local_parquet_path}")
+                local_copy_sql = f"""
+                    COPY (SELECT * FROM {fully_qualified_name})
+                    TO '{local_parquet_path}'
+                    (FORMAT PARQUET)
+                """
+                self.con.sql(local_copy_sql)
+                logger.info(f"Successfully converted {local_file_path} to {local_parquet_path}")
 
         except FileNotFoundError as e:
             logger.error(f"File not found error: {e}")

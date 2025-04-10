@@ -14,7 +14,10 @@ RUN apt-get update && \
 COPY requirements.txt .
 RUN pip install uv
 RUN uv venv
+
+# Make sure boto3 is explicitly installed in the virtual environment
 RUN uv pip install --no-cache-dir -r requirements.txt
+RUN uv pip install --no-cache-dir boto3>=1.35.0
 
 # Copy only necessary files
 COPY src/ src/

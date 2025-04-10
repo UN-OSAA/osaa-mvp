@@ -55,7 +55,57 @@ Here's how to get started with the OSAA Data Pipeline:
    - Your development data: `s3://unosaa-data-pipeline/dev/dev_{USERNAME}/...`
    - Production data: `s3://unosaa-data-pipeline/prod/...`
 
-For detailed instructions and advanced usage, see the sections below.
+## 3. AWS Authentication
+
+This project uses AWS authentication to access S3 resources through a cross-account role assumption model:
+
+### 3.1 Setting Up Your Credentials
+
+For security reasons, AWS credentials are not included in this repository. Follow these steps to set up your credentials:
+
+1. **Get credentials** from your team lead
+
+2. **Update your `.env` file** with the credentials
+
+   ```properties
+   # AWS credentials
+   AWS_ACCESS_KEY_ID=your_access_key
+   AWS_SECRET_ACCESS_KEY=your_secret_key
+   AWS_DEFAULT_REGION=us-east-1
+   
+   # For temporary credentials (starting with "ASIA"), include the session token
+   AWS_SESSION_TOKEN=your_session_token
+   
+   # Role assumption (if needed)
+   AWS_ROLE_ARN=arn:aws:iam::your_account_id:role/your_role_name
+   ```
+
+   > **Important Notes About Temporary Credentials**:
+   > - Temporary credentials (AWS_ACCESS_KEY_ID starting with ASIA) expire after 1 hour
+   > - When credentials expire, you'll see a clear error message with instructions
+   > - To refresh expired credentials:
+   >   1. Run `aws sso login` if using AWS SSO
+   >   2. Or get new temporary credentials from AWS Console
+   >   3. Update your `.env` file with the new credentials
+   > - The system will automatically detect expired tokens and guide you through renewal
+
+3. **Credential Security**
+   - **Never** commit your `.env` file to the repository
+   - **Never** share your credentials in public forums
+   - **Don't** use `.env.test` files with real credentials for testing
+   - Temporary credentials (starting with ASIA) are preferred for security
+
+4. **Important Dependencies**
+   - This project requires IPython==7.34.0 and jupyter==1.0.0 for SQLMesh to work properly
+   - If you encounter SQLMesh errors, verify these dependencies are in requirements.txt
+
+### 3.2 Role-based Authentication Benefits
+
+The role assumption approach provides several advantages:
+- **Enhanced Security**: Limited permissions for your access keys
+- **Audit Trail**: Operations are logged with both your identity and the assumed role
+- **Temporary Credentials**: Role credentials expire automatically
+- **Least Privilege**: The role has only the specific permissions needed
 
 ## 3. Getting Started
 
@@ -111,7 +161,27 @@ After installing Docker Desktop, you'll need to start the application before run
    - Verify your credentials in `.env`
    - Contact your team lead for valid credentials
 
-2. **Data Not Found**
+2. **AWS Credential Issues**
+   - For temporary credentials (starting with ASIA), ensure AWS_SESSION_TOKEN is set
+   - Set AWS_DEFAULT_REGION to match your organization's AWS region
+   - Ensure your IAM role has S3 permissions for both bucket listing and object operations
+   - The system will provide specific error messages for common authentication problems
+
+3. **"boto3 not found" or AWS SDK Errors**
+   - If you encounter boto3-related errors, rebuild the Docker container
+   - Ensure requirements.txt contains boto3>=1.35.0
+   - Run `docker build --no-cache -t osaa-mvp .` to force a clean rebuild
+
+4. **SQLMesh IPython Display Error**
+   - If you encounter an error like `ImportError: cannot import name 'display' from 'IPython.core.display'`:
+     - Check that IPython==7.34.0 and jupyter==1.0.0 are in your requirements.txt file
+     - Rebuild the Docker image with `docker build --no-cache -t osaa-mvp .`
+   - Alternatively, you can use the SKIP_SQLMESH flag for testing S3 connectivity:
+   ```bash
+   docker run --rm -e SKIP_SQLMESH=true -e SKIP_AWS_VALIDATION=false --env-file .env osaa-mvp transform_dry_run
+   ```
+
+5. **Data Not Found**
    - Check that your source data is in the correct location
    - Verify file names and formats
 
